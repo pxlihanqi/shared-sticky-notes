@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>便签</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="note-card" id="noteCard">
+    <div class="note-ops">
+      <button class="op-btn" id="addBtn" title="新增便签">+</button>
+      <button class="op-btn" id="imgBtn" title="添加图片">⊞</button>
+      <button class="op-btn" id="colorBtn" title="换颜色">◐</button>
+      <button class="op-btn" id="toolBtn" title="文本工具箱">⚙</button>
+      <button class="op-btn" id="pinBtn" title="置顶">⊙</button>
+      <button class="op-btn" id="minBtn" title="最小化">—</button>
+      <button class="op-btn" id="closeBtn" title="删除">✕</button>
+    </div>
+    <div class="note-body" id="noteBody"></div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="note.js"></script>
+</body>
+</html>

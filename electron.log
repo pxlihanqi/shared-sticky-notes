@@ -1,0 +1,5 @@
+Server on port 3456
+2026-06-12 17:12:17.533 Electron[17600:75765782] +[NSXPCSharedListener endpointForReply:withListenerName:replyErrorCode:]: an error occurred while attempting to obtain endpoint for listener 'ClientCallsAuxiliary': Connection invalid
+2026-06-12 17:12:17.624 Electron[17600:75765782] HIToolbox: received notification of WindowServer event port death.
+2026-06-12 17:12:17.624 Electron[17600:75765782] port matched the WindowServer port created in BindCGSToRunLoop
+/Users/lihanqi/Desktop/project/shared-sticky-notes/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron exited with signal SIGTERM

@@ -1,0 +1,994 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: transparent;
+  overflow: hidden;
+  height: 100vh;
+}
+
+.note-card {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  position: relative;
+  transition: box-shadow 0.2s;
+  background: #ffeb3b;
+}
+
+.note-card:hover {
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.5);
+}
+
+.note-ops {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  z-index: 100;
+  -webkit-app-region: no-drag;
+}
+
+.op-btn {
+  background: rgba(0, 0, 0, 0.12);
+  border: none;
+  color: inherit;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  opacity: 0.7;
+}
+
+.op-btn:hover {
+  background: rgba(0, 0, 0, 0.3);
+  opacity: 1;
+}
+
+#closeBtn {
+  color: #e53935;
+  opacity: 0.85;
+}
+
+#closeBtn:hover {
+  background: #e53935;
+  color: #fff;
+  opacity: 1;
+}
+
+#pinBtn.pinned {
+  background: rgba(255, 193, 7, 0.7);
+  opacity: 1;
+}
+
+#pinBtn.pinned:hover {
+  background: rgba(255, 193, 7, 0.9);
+}
+
+.note-body {
+  flex: 1;
+  padding: 28px 8px 8px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.note-content {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: none;
+  font-family: inherit;
+  outline: none;
+  width: 100%;
+  -webkit-app-region: no-drag;
+}
+
+.note-content::placeholder {
+  opacity: 0.4;
+}
+
+.note-images {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.note-image-item {
+  position: relative;
+  width: 100%;
+}
+
+.note-image {
+  width: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+  cursor: pointer;
+  max-height: 300px;
+  display: block;
+}
+
+.img-del-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(220, 53, 53, 0.85);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+  -webkit-app-region: no-drag;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.note-image-item:hover .img-del-btn {
+  opacity: 1;
+}
+
+.img-del-btn:hover {
+  background: rgba(220, 53, 53, 1);
+}
+
+.note-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  text-decoration: none;
+  color: inherit;
+  margin-top: 3px;
+  font-size: 12px;
+  transition: background 0.2s;
+}
+
+.note-file:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.note-file-icon {
+  font-size: 22px;
+}
+
+.note-file-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.note-file-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.note-file-size {
+  opacity: 0.5;
+  font-size: 10px;
+}
+
+.color-picker {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-width: 160px;
+  background: rgba(22, 33, 62, 0.95);
+  padding: 6px 8px;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+}
+
+.color-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.color-dot:hover {
+  transform: scale(1.2);
+}
+
+.color-dot.active {
+  border-color: #fff;
+}
+
+.resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  z-index: 100;
+  -webkit-app-region: no-drag;
+}
+
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid rgba(0, 0, 0, 0.3);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.3);
+}
+
+.image-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  cursor: pointer;
+}
+
+.image-overlay img {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.note-body::-webkit-scrollbar { width: 3px; }
+.note-body::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 2px; }
+
+/* 文本百宝箱 - 侧边栏模式 */
+.toolbox {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 340px;
+  height: 100vh;
+  overflow-y: auto;
+  background: rgba(22, 33, 62, 0.98);
+  color: #fff;
+  padding: 12px 14px 20px;
+  -webkit-app-region: no-drag;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3);
+  z-index: 10000;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toolbox.show {
+  transform: translateX(0);
+}
+
+.toolbox::-webkit-scrollbar { width: 6px; }
+.toolbox::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+.toolbox::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.tb-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.tb-title {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.tb-close {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: #fff;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.tb-close:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.tb-header-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.tb-undo {
+  background: rgba(76, 175, 80, 0.35);
+  border: 1px solid rgba(76, 175, 80, 0.5);
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 10px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.tb-undo:hover:not(:disabled) {
+  background: rgba(76, 175, 80, 0.7);
+}
+
+.tb-undo:active:not(:disabled) {
+  background: rgba(76, 175, 80, 0.95);
+}
+
+.tb-undo:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.tb-copy,
+.tb-clear {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 10px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.tb-copy:hover {
+  background: rgba(33, 150, 243, 0.6);
+}
+
+.tb-clear:hover {
+  background: rgba(244, 67, 54, 0.6);
+}
+
+.tb-copy:active,
+.tb-clear:active {
+  transform: scale(0.95);
+}
+
+.tb-stats {
+  font-size: 10px;
+  opacity: 0.55;
+  margin-bottom: 8px;
+}
+.tb-stats-line {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.6;
+}
+
+.tb-group {
+  margin-bottom: 8px;
+}
+
+.tb-group-title {
+  font-size: 10px;
+  opacity: 0.45;
+  margin-bottom: 4px;
+}
+
+.tb-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tb-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: background 0.15s;
+}
+
+.tb-btn:hover {
+  background: rgba(76, 175, 80, 0.75);
+}
+
+.tb-btn:active {
+  background: rgba(76, 175, 80, 0.95);
+}
+
+.tb-btn.md-active {
+  background: rgba(76, 175, 80, 0.85);
+}
+
+.toolbox::-webkit-scrollbar { width: 4px; }
+.toolbox::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+
+/* 查找替换面板 */
+.find-replace {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 340px;
+  height: 100vh;
+  overflow-y: auto;
+  background: rgba(22, 33, 62, 0.98);
+  color: #fff;
+  padding: 12px 14px 20px;
+  -webkit-app-region: no-drag;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3);
+  z-index: 10001;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.find-replace.show {
+  transform: translateX(0);
+}
+
+.fr-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.fr-title {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.fr-close {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: #fff;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.fr-close:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.fr-find,
+.fr-replace {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  margin-bottom: 5px;
+  outline: none;
+}
+
+.fr-find:focus,
+.fr-replace:focus {
+  border-color: rgba(76, 175, 80, 0.75);
+}
+
+.fr-find::placeholder,
+.fr-replace::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.fr-opts {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  opacity: 0.8;
+  margin-bottom: 6px;
+}
+
+.fr-opts label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.fr-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.fr-btn {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #fff;
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: background 0.15s;
+}
+
+.fr-btn:hover {
+  background: rgba(76, 175, 80, 0.75);
+}
+
+.fr-btn:active {
+  background: rgba(76, 175, 80, 0.95);
+}
+
+.fr-status {
+  font-size: 10px;
+  opacity: 0.6;
+  margin-top: 5px;
+  min-height: 12px;
+}
+
+/* Excel 模板生成面板 */
+.excel-template {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 340px;
+  height: 100vh;
+  overflow-y: auto;
+  background: rgba(22, 33, 62, 0.98);
+  color: #fff;
+  padding: 12px 14px 20px;
+  -webkit-app-region: no-drag;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3);
+  z-index: 10001;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.excel-template.show {
+  transform: translateX(0);
+}
+
+.et-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.et-title {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.et-close {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: #fff;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.et-close:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.et-upload-btn {
+  width: 100%;
+  background: rgba(76, 175, 80, 0.6);
+  border: none;
+  color: #fff;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  margin-bottom: 8px;
+  transition: background 0.15s;
+}
+
+.et-upload-btn:hover {
+  background: rgba(76, 175, 80, 0.85);
+}
+
+.et-info {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.et-columns {
+  font-size: 10px;
+  opacity: 0.85;
+  margin-bottom: 8px;
+  max-height: 70px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 6px;
+  border-radius: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.et-col-chip {
+  display: inline-block;
+  background: rgba(76, 175, 80, 0.35);
+  border: 1px solid rgba(76, 175, 80, 0.5);
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  transition: background 0.15s;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.et-col-chip:hover {
+  background: rgba(76, 175, 80, 0.7);
+}
+
+.et-col-chip:active {
+  background: rgba(76, 175, 80, 0.95);
+}
+
+.et-template {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  margin-bottom: 6px;
+  outline: none;
+  font-family: 'Courier New', monospace;
+  resize: vertical;
+  min-height: 60px;
+}
+
+.et-template:focus {
+  border-color: rgba(76, 175, 80, 0.75);
+}
+
+.et-template::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.et-actions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.et-btn {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #fff;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: background 0.15s;
+}
+
+.et-btn:hover {
+  background: rgba(76, 175, 80, 0.75);
+}
+
+.et-btn:active {
+  background: rgba(76, 175, 80, 0.95);
+}
+
+.et-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.et-btn:disabled:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.et-preview {
+  font-size: 10px;
+  opacity: 0.8;
+  margin-top: 6px;
+  max-height: 120px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 6px 8px;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
+}
+
+.et-preview-title {
+  font-size: 10px;
+  opacity: 0.5;
+  margin-bottom: 4px;
+}
+
+.excel-template::-webkit-scrollbar { width: 4px; }
+.excel-template::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+.et-columns::-webkit-scrollbar { width: 3px; }
+.et-columns::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+.et-preview::-webkit-scrollbar { width: 3px; }
+.et-preview::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+/* RSA 加解密面板 */
+.rsa-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 340px;
+  height: 100vh;
+  overflow-y: auto;
+  background: rgba(22, 33, 62, 0.98);
+  color: #fff;
+  padding: 12px 14px 20px;
+  -webkit-app-region: no-drag;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3);
+  z-index: 10001;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rsa-panel.show {
+  transform: translateX(0);
+}
+
+.rsa-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.rsa-title {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.rsa-close {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: #fff;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.rsa-close:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.rsa-info {
+  font-size: 10px;
+  opacity: 0.55;
+  margin-bottom: 8px;
+}
+
+.rsa-batch-opt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  opacity: 0.85;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.rsa-batch-opt input {
+  cursor: pointer;
+}
+
+.rsa-batch-hint {
+  opacity: 0.5;
+  font-size: 10px;
+}
+
+.rsa-key {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  margin-bottom: 6px;
+  outline: none;
+  font-family: 'Courier New', monospace;
+  resize: vertical;
+  min-height: 48px;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.rsa-key:focus {
+  border-color: rgba(76, 175, 80, 0.75);
+}
+
+.rsa-key::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+  font-family: -apple-system, sans-serif;
+}
+
+.rsa-actions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.rsa-btn {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #fff;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: background 0.15s;
+}
+
+.rsa-btn:hover {
+  background: rgba(76, 175, 80, 0.75);
+}
+
+.rsa-btn:active {
+  background: rgba(76, 175, 80, 0.95);
+}
+
+.rsa-status {
+  font-size: 10px;
+  opacity: 0.7;
+  margin-top: 4px;
+  min-height: 12px;
+}
+
+.rsa-panel::-webkit-scrollbar { width: 4px; }
+.rsa-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+.rsa-key::-webkit-scrollbar { height: 3px; }
+.rsa-key::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+/* Markdown 预览 */
+.markdown-preview {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  cursor: pointer;
+  word-break: break-word;
+}
+
+.markdown-preview h1 { font-size: 1.5em; margin: 0.5em 0; font-weight: 600; }
+.markdown-preview h2 { font-size: 1.3em; margin: 0.4em 0; font-weight: 600; }
+.markdown-preview h3 { font-size: 1.1em; margin: 0.3em 0; font-weight: 600; }
+.markdown-preview h4, .markdown-preview h5, .markdown-preview h6 { font-size: 1em; margin: 0.3em 0; font-weight: 600; }
+
+.markdown-preview p { margin: 0.4em 0; }
+
+.markdown-preview ul, .markdown-preview ol {
+  margin: 0.4em 0;
+  padding-left: 1.5em;
+}
+
+.markdown-preview li { margin: 0.2em 0; }
+
+.markdown-preview code {
+  background: rgba(0, 0, 0, 0.15);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+}
+
+.markdown-preview pre {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+
+.markdown-preview pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.markdown-preview blockquote {
+  border-left: 3px solid rgba(0, 0, 0, 0.3);
+  margin: 0.5em 0;
+  padding: 0.3em 0.8em;
+  opacity: 0.85;
+}
+
+.markdown-preview a {
+  text-decoration: underline;
+  opacity: 0.9;
+}
+
+.markdown-preview img {
+  max-width: 100%;
+  border-radius: 4px;
+}
+
+.markdown-preview hr {
+  border: none;
+  border-top: 1px solid rgba(0, 0, 0, 0.2);
+  margin: 0.8em 0;
+}
+
+.markdown-preview table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5em 0;
+  font-size: 12px;
+}
+
+.markdown-preview th, .markdown-preview td {
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.markdown-preview th {
+  background: rgba(0, 0, 0, 0.1);
+  font-weight: 600;
+}
+
+.markdown-preview::-webkit-scrollbar { width: 3px; }
+.markdown-preview::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 2px; }

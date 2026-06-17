@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>共享便签</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; min-height: 100vh; padding: 20px; }
+    h1 { color: rgba(255,255,255,0.8); font-size: 20px; margin-bottom: 16px; font-weight: 500; }
+    .board { position: relative; width: 100%; height: calc(100vh - 100px); overflow: auto; }
+    .note { position: absolute; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.35); display: flex; flex-direction: column; min-width: 180px; min-height: 140px; cursor: move; }
+    .note:hover { box-shadow: 0 6px 28px rgba(0,0,0,0.5); }
+    .note.dragging { opacity: 0.9; z-index: 9999; }
+    .note-header { display: flex; align-items: center; justify-content: space-between; padding: 5px 10px; border-radius: 10px 10px 0 0; background: rgba(0,0,0,0.12); flex-shrink: 0; }
+    .note-title { font-size: 10px; opacity: 0.6; }
+    .note-actions { display: flex; gap: 3px; }
+    .note-actions button { background: rgba(0,0,0,0.2); border: none; color: inherit; width: 20px; height: 20px; border-radius: 4px; cursor: pointer; font-size: 11px; }
+    .note-actions button:hover { background: rgba(0,0,0,0.4); }
+    .board::-webkit-scrollbar { display: none; }
+    .board { -ms-overflow-style: none; scrollbar-width: none; }
+    .note-body::-webkit-scrollbar { width: 3px; }
+    .note-body::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 2px; }
+    .note-body { flex: 1; padding: 8px 10px; overflow: auto; }
+    .note-content { width: 100%; height: 100%; border: none; background: transparent; color: inherit; font-size: 13px; line-height: 1.5; resize: none; font-family: inherit; outline: none; }
+    .note-image { max-width: 100%; border-radius: 6px; cursor: pointer; }
+    .note-file { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: rgba(0,0,0,0.1); border-radius: 6px; text-decoration: none; color: inherit; margin-top: 3px; font-size: 12px; }
+    .add-btn { position: fixed; bottom: 24px; right: 24px; width: 56px; height: 56px; border-radius: 50%; background: #4caf50; color: #fff; border: none; font-size: 28px; cursor: pointer; box-shadow: 0 4px 20px rgba(76,175,80,0.4); transition: all 0.2s; }
+    .add-btn:hover { transform: scale(1.1); background: #66bb6a; }
+    .resize-handle { position: absolute; bottom: 0; right: 0; width: 14px; height: 14px; cursor: nwse-resize; }
+    .color-picker { position: absolute; bottom: -36px; left: 0; display: flex; gap: 4px; background: rgba(22,33,62,0.95); padding: 4px 8px; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.5); z-index: 100; }
+    .color-dot { width: 16px; height: 16px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+    .color-dot:hover { transform: scale(1.2); }
+    .color-dot.active { border-color: #fff; }
+    .status { position: fixed; top: 20px; right: 20px; font-size: 12px; color: rgba(255,255,255,0.4); }
+    .status.connected { color: #4caf50; }
+  </style>
+</head>
+<body>
+  <h1>📌 共享便签</h1>
+  <div class="status" id="status">● 连接中...</div>
+  <div class="board" id="board"></div>
+  <button class="add-btn" id="addBtn" title="新建便签">+</button>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const COLORS = ['#ffeb3b','#ff9800','#e91e63','#4caf50','#2196f3','#9c27b0','#00bcd4','#ffffff'];
+    const board = document.getElementById('board');
+    const status = document.getElementById('status');
+    const socket = io();
+    socket.on('connect', () => { status.textContent = '● 已连接'; status.className = 'status connected'; });
+    socket.on('disconnect', () => { status.textContent = '● 已断开'; status.className = 'status'; });
+
+    async function loadNotes() {
+      const res = await fetch('/api/notes');
+      const notes = await res.json();
+      notes.forEach(n => renderNote(n));
+    }
+
+    function renderNote(note) {
+      if (document.getElementById('note-' + note.id)) return;
+      const el = document.createElement('div');
+      el.className = 'note';
+      el.id = 'note-' + note.id;
+      el.dataset.updatedAt = note.updated_at;
+      el.style.left = note.x + 'px';
+      el.style.top = note.y + 'px';
+      el.style.width = (note.width || 240) + 'px';
+      el.style.height = (note.height || 200) + 'px';
+      el.style.background = note.color;
+      el.style.color = isLight(note.color) ? '#333' : '#fff';
+
+      const typeLabel = {text:'文字',image:'图片',file:'文件'}[note.type] || '文字';
+      el.innerHTML = `
+        <div class="note-header">
+          <span class="note-title">${typeLabel}</span>
+          <div class="note-actions">
+            <button data-action="color" title="换颜色">🎨</button>
+            <button data-action="delete" title="删除">✕</button>
+          </div>
+        </div>
+        <div class="note-body">${getBodyHTML(note)}</div>
+        <div class="resize-handle"></div>
+      `;
+
+      if (note.type === 'text') {
+        const ta = el.querySelector('.note-content');
+        let timer;
+        ta.addEventListener('input', () => {
+          clearTimeout(timer);
+          timer = setTimeout(() => {
+            fetch('/api/notes/' + note.id, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({content:ta.value}) });
+          }, 500);
+        });
+      }
+
+      if (note.type === 'image') {
+        el.querySelector('img').addEventListener('click', () => showPreview(note.content));
+      }
+
+      setupDrag(el, note);
+      setupActions(el, note);
+      board.appendChild(el);
+    }
+
+    function getBodyHTML(note) {
+      if (note.type === 'text') return `<textarea class="note-content" placeholder="输入内容...">${esc(note.content)}</textarea>`;
+      if (note.type === 'image') return `<img class="note-image" src="${esc(note.content)}">`;
+      if (note.type === 'file') {
+        try {
+          return JSON.parse(note.content).map(f => `<a class="note-file" href="${esc(f.url)}" target="_blank" download="${esc(f.originalName)}">📄 ${esc(f.originalName)}</a>`).join('');
+        } catch { return `<div>${esc(note.content)}</div>`; }
+      }
+      return `<div>${esc(note.content)}</div>`;
+    }
+
+    function setupDrag(el, note) {
+      let dragging = false, resizing = false, sx, sy, sw, sh;
+      el.querySelector('.note-header').addEventListener('mousedown', e => {
+        if (e.target.closest('.note-actions')) return;
+        dragging = true; sx = e.clientX; sy = e.clientY; e.preventDefault();
+      });
+      el.querySelector('.resize-handle').addEventListener('mousedown', e => {
+        resizing = true; sx = e.clientX; sy = e.clientY; sw = el.offsetWidth; sh = el.offsetHeight; e.preventDefault();
+      });
+      document.addEventListener('mousemove', e => {
+        if (dragging) { el.style.left = (el.offsetLeft + e.clientX - sx) + 'px'; el.style.top = (el.offsetTop + e.clientY - sy) + 'px'; sx = e.clientX; sy = e.clientY; }
+        if (resizing) { el.style.width = Math.max(180, sw + e.clientX - sx) + 'px'; el.style.height = Math.max(120, sh + e.clientY - sy) + 'px'; }
+      });
+      document.addEventListener('mouseup', () => {
+        if (dragging || resizing) { dragging = false; resizing = false; fetch('/api/notes/' + note.id, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({x:el.offsetLeft, y:el.offsetTop, width:el.offsetWidth, height:el.offsetHeight}) }); }
+      });
+    }
+
+    function setupActions(el, note) {
+      el.addEventListener('click', async e => {
+        const a = e.target.dataset.action;
+        if (a === 'delete') { await fetch('/api/notes/' + note.id, {method:'DELETE'}); el.remove(); }
+        if (a === 'color') {
+          let picker = el.querySelector('.color-picker');
+          if (picker) { picker.remove(); return; }
+          picker = document.createElement('div');
+          picker.className = 'color-picker';
+          COLORS.forEach(c => {
+            const d = document.createElement('div');
+            d.className = 'color-dot' + (c === note.color ? ' active' : '');
+            d.style.background = c;
+            d.onclick = async () => { el.style.background = c; el.style.color = isLight(c)?'#333':'#fff'; note.color = c; await fetch('/api/notes/'+note.id, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({color:c})}); picker.remove(); };
+            picker.appendChild(d);
+          });
+          el.appendChild(picker);
+          setTimeout(() => { const close = ev => { if (!picker.contains(ev.target)) { picker.remove(); document.removeEventListener('click',close); } }; document.addEventListener('click',close); }, 0);
+        }
+      });
+    }
+
+    document.getElementById('addBtn').addEventListener('click', async () => {
+      const x = 100 + Math.random() * (window.innerWidth - 350);
+      const y = 100 + Math.random() * (window.innerHeight - 300);
+      await fetch('/api/notes', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({type:'text', x, y, color:COLORS[Math.floor(Math.random()*COLORS.length)]}) });
+    });
+
+    socket.on('note:created', n => renderNote(n));
+    socket.on('note:deleted', ({ id }) => { const el = document.getElementById('note-' + id); if (el) el.remove(); });
+    socket.on('note:updated', n => {
+      const el = document.getElementById('note-' + n.id);
+      if (!el) return;
+      const ta = el.querySelector('.note-content');
+      if (ta && document.hasFocus() && document.activeElement === ta) return;
+      el.style.left = n.x+'px'; el.style.top = n.y+'px';
+      el.style.width = (n.width||240)+'px'; el.style.height = (n.height||200)+'px';
+      el.style.background = n.color;
+      el.style.color = isLight(n.color)?'#333':'#fff';
+      if (ta && ta.value !== (n.content || '')) ta.value = n.content || '';
+    });
+
+    setInterval(async () => {
+      try {
+        const res = await fetch('/api/notes');
+        const notes = await res.json();
+        notes.forEach(n => {
+          const el = document.getElementById('note-' + n.id);
+          if (!el) { renderNote(n); return; }
+          const ta = el.querySelector('.note-content');
+          if (ta && document.hasFocus() && document.activeElement === ta) return;
+          el.style.left = n.x+'px'; el.style.top = n.y+'px';
+          el.style.width = (n.width||240)+'px'; el.style.height = (n.height||200)+'px';
+          el.style.background = n.color;
+          el.style.color = isLight(n.color)?'#333':'#fff';
+          if (ta && ta.value !== (n.content || '')) ta.value = n.content || '';
+        });
+        document.querySelectorAll('.note').forEach(el => {
+          const id = el.id.replace('note-', '');
+          if (!notes.find(n => n.id === id)) el.remove();
+        });
+      } catch (e) {}
+    }, 3000);
+
+    function showPreview(src) { const o = document.createElement('div'); o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;z-index:99999;cursor:pointer'; o.innerHTML=`<img src="${src}" style="max-width:90vw;max-height:90vh;border-radius:8px">`; o.onclick=()=>o.remove(); document.body.appendChild(o); }
+    function isLight(h) { const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16); return (r*299+g*587+b*114)/1000>150; }
+    function esc(s) { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+
+    loadNotes();
+  </script>
+</body>
+</html>
