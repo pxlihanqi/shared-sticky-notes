@@ -14,9 +14,13 @@
     .note.dragging { opacity: 0.9; z-index: 9999; }
     .note-header { display: flex; align-items: center; justify-content: space-between; padding: 5px 10px; border-radius: 10px 10px 0 0; background: rgba(0,0,0,0.12); flex-shrink: 0; }
     .note-title { font-size: 10px; opacity: 0.6; }
-    .note-actions { display: flex; gap: 3px; }
+    .note-actions { display: flex; gap: 3px; position: relative; }
     .note-actions button { background: rgba(0,0,0,0.2); border: none; color: inherit; width: 20px; height: 20px; border-radius: 4px; cursor: pointer; font-size: 11px; }
     .note-actions button:hover { background: rgba(0,0,0,0.4); }
+    .note-dropdown { display: none; position: absolute; top: 22px; right: 0; background: rgba(30,30,50,0.98); border-radius: 8px; padding: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); z-index: 200; min-width: 120px; }
+    .note-dropdown.show { display: block; }
+    .note-dropdown button { display: block; width: 100%; background: transparent; border: none; color: #fff; padding: 7px 10px; text-align: left; font-size: 12px; cursor: pointer; border-radius: 6px; transition: background 0.15s; white-space: nowrap; }
+    .note-dropdown button:hover { background: rgba(76,175,80,0.6); }
     .board::-webkit-scrollbar { display: none; }
     .board { -ms-overflow-style: none; scrollbar-width: none; }
     .note-body::-webkit-scrollbar { width: 3px; }
@@ -34,14 +38,166 @@
     .color-dot.active { border-color: #fff; }
     .status { position: fixed; top: 20px; right: 20px; font-size: 12px; color: rgba(255,255,255,0.4); }
     .status.connected { color: #4caf50; }
+    .header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+    .header h1 { margin-bottom: 0; }
+    .search-box { position: relative; flex: 0 1 280px; }
+    .search-input { width: 100%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 8px 12px 8px 32px; border-radius: 20px; font-size: 13px; outline: none; transition: border-color 0.2s; }
+    .search-input:focus { border-color: rgba(76,175,80,0.7); }
+    .search-input::placeholder { color: rgba(255,255,255,0.4); }
+    .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 14px; opacity: 0.5; pointer-events: none; }
+    .search-clear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.2); border: none; color: #fff; width: 18px; height: 18px; border-radius: 50%; cursor: pointer; font-size: 10px; display: none; }
+    .search-clear.show { display: block; }
+    .search-count { font-size: 11px; color: rgba(255,255,255,0.4); margin-left: 8px; }
+    .note.search-hidden { display: none; }
+    .toolbox-toggle { background: rgba(255,255,255,0.1); border: none; color: #fff; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 18px; transition: all 0.2s; }
+    .toolbox-toggle:hover { background: rgba(255,255,255,0.2); transform: scale(1.1); }
+    .global-toolbox { display: none; position: fixed; top: 60px; left: 20px; background: rgba(30,30,50,0.95); border-radius: 12px; padding: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); z-index: 1000; min-width: 220px; }
+    .global-toolbox.show { display: block; }
+    .global-toolbox-content { display: flex; flex-direction: column; gap: 8px; }
+    .global-toolbox-item { background: rgba(255,255,255,0.1); border: none; color: #fff; padding: 10px 12px; border-radius: 8px; cursor: pointer; text-align: left; font-size: 13px; transition: background 0.2s; }
+    .global-toolbox-item:hover { background: rgba(255,255,255,0.2); }
+    .note-images { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+    .note-image-item { position: relative; width: 100%; }
+    .img-del-btn { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 50%; border: none; background: rgba(220,53,53,0.85); color: #fff; font-size: 11px; cursor: pointer; opacity: 0; transition: opacity 0.15s; display: flex; align-items: center; justify-content: center; }
+    .note-image-item:hover .img-del-btn { opacity: 1; }
+
+    /* 文本工具箱侧边栏 */
+    .web-toolbox { position: fixed; top: 0; right: 0; width: 340px; height: 100vh; overflow-y: auto; background: rgba(22,33,62,0.98); color: #fff; padding: 12px 14px 20px; box-shadow: -4px 0 24px rgba(0,0,0,0.3); z-index: 10000; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); }
+    .web-toolbox.show { transform: translateX(0); }
+    .web-toolbox::-webkit-scrollbar { width: 4px; }
+    .web-toolbox::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+    .wtb-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .wtb-title { font-size: 12px; font-weight: 600; opacity: 0.9; }
+    .wtb-header-actions { display: flex; gap: 6px; align-items: center; }
+    .wtb-close { background: rgba(255,255,255,0.12); border: none; color: #fff; width: 18px; height: 18px; border-radius: 50%; cursor: pointer; font-size: 10px; }
+    .wtb-close:hover { background: rgba(255,255,255,0.25); }
+    .wtb-copy, .wtb-clear { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 10px; white-space: nowrap; }
+    .wtb-copy:hover { background: rgba(33,150,243,0.6); }
+    .wtb-clear:hover { background: rgba(244,67,54,0.6); }
+    .wtb-undo { background: rgba(76,175,80,0.35); border: 1px solid rgba(76,175,80,0.5); color: #fff; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 10px; white-space: nowrap; }
+    .wtb-undo:hover:not(:disabled) { background: rgba(76,175,80,0.7); }
+    .wtb-undo:disabled { opacity: 0.3; cursor: not-allowed; }
+    .wtb-stats { font-size: 10px; opacity: 0.55; margin-bottom: 8px; }
+    .wtb-stats-line { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.6; }
+    .wtb-group { margin-bottom: 8px; }
+    .wtb-group-title { font-size: 10px; opacity: 0.45; margin-bottom: 4px; }
+    .wtb-btns { display: flex; flex-wrap: wrap; gap: 4px; }
+    .wtb-btn { background: rgba(255,255,255,0.1); border: none; color: #fff; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 11px; transition: background 0.15s; }
+    .wtb-btn:hover { background: rgba(76,175,80,0.75); }
+    .wtb-btn:active { background: rgba(76,175,80,0.95); }
+    .wtb-btn.md-active { background: rgba(76,175,80,0.85); }
+
+    /* Markdown 预览 */
+    .markdown-preview { flex: 1; overflow-y: auto; padding: 4px 8px; font-size: 13px; line-height: 1.6; cursor: pointer; word-break: break-word; color: inherit; }
+    .markdown-preview h1 { font-size: 1.5em; margin: 0.5em 0; font-weight: 600; }
+    .markdown-preview h2 { font-size: 1.3em; margin: 0.4em 0; font-weight: 600; }
+    .markdown-preview h3 { font-size: 1.1em; margin: 0.4em 0; font-weight: 600; }
+    .markdown-preview p { margin: 0.4em 0; }
+    .markdown-preview ul, .markdown-preview ol { margin: 0.4em 0; padding-left: 1.5em; }
+    .markdown-preview li { margin: 0.2em 0; }
+    .markdown-preview code { background: rgba(0,0,0,0.15); padding: 0.1em 0.3em; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 0.9em; }
+    .markdown-preview pre { background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; overflow-x: auto; margin: 0.5em 0; }
+    .markdown-preview pre code { background: transparent; padding: 0; }
+    .markdown-preview blockquote { border-left: 3px solid rgba(0,0,0,0.3); margin: 0.5em 0; padding: 0.3em 0.8em; opacity: 0.85; }
+    .markdown-preview a { text-decoration: underline; opacity: 0.9; }
+    .markdown-preview img { max-width: 100%; border-radius: 4px; }
+    .markdown-preview table { border-collapse: collapse; width: 100%; margin: 0.5em 0; font-size: 12px; }
+    .markdown-preview th, .markdown-preview td { border: 1px solid rgba(0,0,0,0.2); padding: 4px 8px; text-align: left; }
+    .markdown-preview th { background: rgba(0,0,0,0.1); font-weight: 600; }
+
+    /* 查找替换面板 */
+    .find-replace { position: fixed; top: 0; right: 0; width: 340px; height: 100vh; overflow-y: auto; background: rgba(22,33,62,0.98); color: #fff; padding: 12px 14px 20px; box-shadow: -4px 0 24px rgba(0,0,0,0.3); z-index: 10001; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); }
+    .find-replace.show { transform: translateX(0); }
+    .fr-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .fr-title { font-size: 12px; font-weight: 600; opacity: 0.9; }
+    .fr-close { background: rgba(255,255,255,0.12); border: none; color: #fff; width: 18px; height: 18px; border-radius: 50%; cursor: pointer; font-size: 10px; }
+    .fr-close:hover { background: rgba(255,255,255,0.25); }
+    .fr-find, .fr-replace { width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 5px 8px; border-radius: 6px; font-size: 12px; margin-bottom: 5px; outline: none; }
+    .fr-find:focus, .fr-replace:focus { border-color: rgba(76,175,80,0.75); }
+    .fr-find::placeholder, .fr-replace::placeholder { color: rgba(255,255,255,0.4); }
+    .fr-opts { display: flex; gap: 12px; font-size: 11px; opacity: 0.8; margin-bottom: 6px; }
+    .fr-opts label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+    .fr-actions { display: flex; gap: 6px; }
+    .fr-btn { flex: 1; background: rgba(255,255,255,0.1); border: none; color: #fff; padding: 5px 8px; border-radius: 6px; cursor: pointer; font-size: 11px; transition: background 0.15s; }
+    .fr-btn:hover { background: rgba(76,175,80,0.75); }
+    .fr-status { font-size: 10px; opacity: 0.6; margin-top: 5px; min-height: 12px; }
+
+    /* RSA 面板 */
+    .rsa-panel { position: fixed; top: 0; right: 0; width: 340px; height: 100vh; overflow-y: auto; background: rgba(22,33,62,0.98); color: #fff; padding: 12px 14px 20px; box-shadow: -4px 0 24px rgba(0,0,0,0.3); z-index: 10001; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); }
+    .rsa-panel.show { transform: translateX(0); }
+    .rsa-panel::-webkit-scrollbar { width: 4px; }
+    .rsa-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+    .rsa-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .rsa-title { font-size: 12px; font-weight: 600; opacity: 0.9; }
+    .rsa-close { background: rgba(255,255,255,0.12); border: none; color: #fff; width: 18px; height: 18px; border-radius: 50%; cursor: pointer; font-size: 10px; }
+    .rsa-close:hover { background: rgba(255,255,255,0.25); }
+    .rsa-info { font-size: 10px; opacity: 0.55; margin-bottom: 8px; }
+    .rsa-key { width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 8px; border-radius: 6px; font-size: 10px; margin-bottom: 6px; outline: none; font-family: 'Courier New', monospace; resize: vertical; min-height: 48px; white-space: pre; overflow-x: auto; }
+    .rsa-key:focus { border-color: rgba(76,175,80,0.75); }
+    .rsa-key::placeholder { color: rgba(255,255,255,0.4); font-family: -apple-system, sans-serif; }
+    .rsa-actions { display: flex; gap: 6px; margin-bottom: 6px; }
+    .rsa-btn { flex: 1; background: rgba(255,255,255,0.1); border: none; color: #fff; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 11px; transition: background 0.15s; }
+    .rsa-btn:hover { background: rgba(76,175,80,0.75); }
+    .rsa-status { font-size: 10px; opacity: 0.7; margin-top: 4px; min-height: 12px; }
+    .rsa-batch-opt { display: flex; align-items: center; gap: 6px; font-size: 11px; opacity: 0.85; margin-bottom: 8px; cursor: pointer; }
+    .rsa-batch-opt input { cursor: pointer; }
+
+    /* Excel 模板面板 */
+    .excel-template { position: fixed; top: 0; right: 0; width: 340px; height: 100vh; overflow-y: auto; background: rgba(22,33,62,0.98); color: #fff; padding: 12px 14px 20px; box-shadow: -4px 0 24px rgba(0,0,0,0.3); z-index: 10001; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); }
+    .excel-template.show { transform: translateX(0); }
+    .excel-template::-webkit-scrollbar { width: 4px; }
+    .excel-template::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+    .et-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .et-title { font-size: 12px; font-weight: 600; opacity: 0.9; }
+    .et-close { background: rgba(255,255,255,0.12); border: none; color: #fff; width: 18px; height: 18px; border-radius: 50%; cursor: pointer; font-size: 10px; }
+    .et-close:hover { background: rgba(255,255,255,0.25); }
+    .et-upload-btn { width: 100%; background: rgba(76,175,80,0.6); border: none; color: #fff; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 12px; margin-bottom: 8px; transition: background 0.15s; }
+    .et-upload-btn:hover { background: rgba(76,175,80,0.85); }
+    .et-info { font-size: 11px; opacity: 0.7; margin-bottom: 8px; line-height: 1.5; }
+    .et-columns { font-size: 10px; opacity: 0.85; margin-bottom: 8px; max-height: 70px; overflow-y: auto; background: rgba(0,0,0,0.2); padding: 6px; border-radius: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
+    .et-col-chip { display: inline-block; background: rgba(76,175,80,0.35); border: 1px solid rgba(76,175,80,0.5); color: #fff; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-family: 'Courier New', monospace; font-size: 10px; transition: background 0.15s; }
+    .et-col-chip:hover { background: rgba(76,175,80,0.7); }
+    .et-template { width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 8px; border-radius: 6px; font-size: 11px; margin-bottom: 6px; outline: none; font-family: 'Courier New', monospace; resize: vertical; min-height: 60px; }
+    .et-template:focus { border-color: rgba(76,175,80,0.75); }
+    .et-template::placeholder { color: rgba(255,255,255,0.4); }
+    .et-actions { display: flex; gap: 6px; margin-bottom: 6px; }
+    .et-btn { flex: 1; background: rgba(255,255,255,0.1); border: none; color: #fff; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 11px; transition: background 0.15s; }
+    .et-btn:hover { background: rgba(76,175,80,0.75); }
+    .et-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .et-preview { font-size: 10px; opacity: 0.8; margin-top: 6px; max-height: 120px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 6px 8px; border-radius: 4px; white-space: pre-wrap; word-break: break-word; line-height: 1.6; }
+    .et-columns::-webkit-scrollbar { width: 3px; }
+    .et-columns::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+    /* 图片预览遮罩 */
+    .image-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.88); display: flex; align-items: center; justify-content: center; z-index: 99999; cursor: pointer; }
+    .image-overlay img { max-width: 90vw; max-height: 90vh; border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
   </style>
 </head>
 <body>
-  <h1>📌 共享便签</h1>
+  <div class="header">
+    <h1>📌 共享便签</h1>
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input type="text" class="search-input" id="searchInput" placeholder="搜索便签内容...">
+      <button class="search-clear" id="searchClear">✕</button>
+      <span class="search-count" id="searchCount"></span>
+    </div>
+    <button class="toolbox-toggle" id="toolboxToggle" title="工具箱">🔧</button>
+  </div>
+  <div class="global-toolbox" id="toolbox">
+    <div class="global-toolbox-content">
+      <button class="global-toolbox-item" id="uploadBtn">🖼️ 上传图片</button>
+      <button class="global-toolbox-item" id="alarmBtn">⏰ 定时闹钟</button>
+    </div>
+  </div>
   <div class="status" id="status">● 连接中...</div>
   <div class="board" id="board"></div>
   <button class="add-btn" id="addBtn" title="新建便签">+</button>
   <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="web-tools.js"></script>
   <script>
     const COLORS = ['#ffeb3b','#ff9800','#e91e63','#4caf50','#2196f3','#9c27b0','#00bcd4','#ffffff'];
     const board = document.getElementById('board');
@@ -49,6 +205,16 @@
     const socket = io();
     socket.on('connect', () => { status.textContent = '● 已连接'; status.className = 'status connected'; });
     socket.on('disconnect', () => { status.textContent = '● 已断开'; status.className = 'status'; });
+
+    let activeNoteId = null;
+    let activeTextarea = null;
+    let toolboxPanel = null;
+    let findReplacePanel = null;
+    let rsaPanel = null;
+    let excelTemplatePanel = null;
+    let undoStack = [];
+    let markdownPreviewActive = false;
+    let markdownPreviewContainer = null;
 
     async function loadNotes() {
       const res = await fetch('/api/notes');
@@ -74,8 +240,13 @@
         <div class="note-header">
           <span class="note-title">${typeLabel}</span>
           <div class="note-actions">
+            <button data-action="toolbox" title="工具箱">🧰</button>
             <button data-action="color" title="换颜色">🎨</button>
-            <button data-action="delete" title="删除">✕</button>
+            <button data-action="more" title="更多">⋯</button>
+            <div class="note-dropdown">
+              <button data-action="upload">🖼️ 上传图片</button>
+              <button data-action="delete">✕ 删除</button>
+            </div>
           </div>
         </div>
         <div class="note-body">${getBodyHTML(note)}</div>
@@ -91,10 +262,12 @@
             fetch('/api/notes/' + note.id, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({content:ta.value}) });
           }, 500);
         });
+        ta.addEventListener('focus', () => { activeNoteId = note.id; activeTextarea = ta; });
       }
 
       if (note.type === 'image') {
-        el.querySelector('img').addEventListener('click', () => showPreview(note.content));
+        const imgs = el.querySelectorAll('.note-image');
+        imgs.forEach(img => img.addEventListener('click', () => showPreview(img.src)));
       }
 
       setupDrag(el, note);
@@ -104,10 +277,18 @@
 
     function getBodyHTML(note) {
       if (note.type === 'text') return `<textarea class="note-content" placeholder="输入内容...">${esc(note.content)}</textarea>`;
-      if (note.type === 'image') return `<img class="note-image" src="${esc(note.content)}">`;
+      if (note.type === 'image') {
+        try {
+          const urls = JSON.parse(note.content);
+          if (Array.isArray(urls)) {
+            return `<div class="note-images">${urls.map(u => `<div class="note-image-item"><img class="note-image" src="${esc(u)}"></div>`).join('')}</div>`;
+          }
+        } catch {}
+        return `<div class="note-images"><div class="note-image-item"><img class="note-image" src="${esc(note.content)}"></div></div>`;
+      }
       if (note.type === 'file') {
         try {
-          return JSON.parse(note.content).map(f => `<a class="note-file" href="${esc(f.url)}" target="_blank" download="${esc(f.originalName)}">📄 ${esc(f.originalName)}</a>`).join('');
+          return JSON.parse(note.content).map(f => `<a class="note-file" href="${esc(f.url)}" target="_blank" download="${esc(f.originalName)}">📄 ${esc(f.originalName)} <span style="opacity:0.5;font-size:10px">${formatSize(f.size || 0)}</span></a>`).join('');
         } catch { return `<div>${esc(note.content)}</div>`; }
       }
       return `<div>${esc(note.content)}</div>`;
@@ -134,7 +315,48 @@
     function setupActions(el, note) {
       el.addEventListener('click', async e => {
         const a = e.target.dataset.action;
-        if (a === 'delete') { await fetch('/api/notes/' + note.id, {method:'DELETE'}); el.remove(); }
+        if (a === 'more') {
+          const dd = el.querySelector('.note-dropdown');
+          if (dd) dd.classList.toggle('show');
+          e.stopPropagation();
+          return;
+        }
+        if (a === 'toolbox') {
+          activeNoteId = note.id;
+          const ta = el.querySelector('.note-content');
+          if (ta) activeTextarea = ta;
+          openWebToolbox();
+          return;
+        }
+        if (a === 'delete') {
+          el.querySelector('.note-dropdown').classList.remove('show');
+          await fetch('/api/notes/' + note.id, {method:'DELETE'});
+          el.remove();
+        }
+        if (a === 'upload') {
+          el.querySelector('.note-dropdown').classList.remove('show');
+          const input = document.createElement('input');
+          input.type = 'file'; input.accept = 'image/*'; input.multiple = true;
+          input.addEventListener('change', async () => {
+            const files = Array.from(input.files).filter(f => f.type.startsWith('image/'));
+            if (!files.length) return;
+            const existing = note.type === 'image' ? (() => { try { return JSON.parse(note.content); } catch { return [note.content]; } })() : [];
+            const uploaded = [];
+            for (const file of files) {
+              const fd = new FormData(); fd.append('file', file);
+              const res = await fetch('/api/upload', { method: 'POST', body: fd });
+              const data = await res.json();
+              uploaded.push(data.url);
+            }
+            const merged = existing.concat(uploaded);
+            const content = JSON.stringify(merged);
+            await fetch('/api/notes/' + note.id, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ type:'image', content }) });
+            note.type = 'image'; note.content = content;
+            el.querySelector('.note-body').innerHTML = getBodyHTML(note);
+            el.querySelectorAll('.note-image').forEach(img => img.addEventListener('click', () => showPreview(img.src)));
+          });
+          input.click();
+        }
         if (a === 'color') {
           let picker = el.querySelector('.color-picker');
           if (picker) { picker.remove(); return; }
@@ -159,6 +381,519 @@
       await fetch('/api/notes', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({type:'text', x, y, color:COLORS[Math.floor(Math.random()*COLORS.length)]}) });
     });
 
+    // ============ 上传图片 ============
+    const uploadBtn = document.getElementById('uploadBtn');
+    const uploadInput = document.createElement('input');
+    uploadInput.type = 'file'; uploadInput.accept = 'image/*'; uploadInput.multiple = true; uploadInput.style.display = 'none';
+    document.body.appendChild(uploadInput);
+    uploadBtn.addEventListener('click', () => uploadInput.click());
+    uploadInput.addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
+      if (!files.length) return;
+      for (const file of files) {
+        const fd = new FormData(); fd.append('file', file);
+        const res = await fetch('/api/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        const x = 100 + Math.random() * (window.innerWidth - 350);
+        const y = 100 + Math.random() * (window.innerHeight - 300);
+        await fetch('/api/notes', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({type:'image', content:data.url, x, y, color:COLORS[Math.floor(Math.random()*COLORS.length)]}) });
+      }
+      toolbox.classList.remove('show');
+      uploadInput.value = '';
+    });
+
+    // ============ 定时闹钟 ============
+    const alarmBtn = document.getElementById('alarmBtn');
+    let alarmTimer = null;
+    alarmBtn.addEventListener('click', () => {
+      const time = prompt('设置闹钟时间（格式: HH:MM，如 14:30）：');
+      if (!time) return;
+      const [hours, minutes] = time.split(':').map(Number);
+      if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) { alert('时间格式错误'); return; }
+      const now = new Date();
+      const alarmTime = new Date(); alarmTime.setHours(hours, minutes, 0, 0);
+      if (alarmTime <= now) alarmTime.setDate(alarmTime.getDate() + 1);
+      if (alarmTimer) clearTimeout(alarmTimer);
+      alarmTimer = setTimeout(() => { alert(`⏰ 闹钟提醒：现在是 ${time}！`); alarmTimer = null; }, alarmTime - now);
+      alert(`闹钟已设置：${alarmTime.toLocaleTimeString()}`);
+      toolbox.classList.remove('show');
+    });
+
+    // ============ 工具箱 ============
+    const toolboxToggle = document.getElementById('toolboxToggle');
+    const toolbox = document.getElementById('toolbox');
+    toolboxToggle.addEventListener('click', (e) => { e.stopPropagation(); toolbox.classList.toggle('show'); });
+
+    // ============ 搜索功能 ============
+    const searchInput = document.getElementById('searchInput');
+    const searchClear = document.getElementById('searchClear');
+    const searchCount = document.getElementById('searchCount');
+    function getAllNotes() {
+      return Array.from(document.querySelectorAll('.note')).map(el => ({
+        el, id: el.id.replace('note-', ''),
+        content: (el.querySelector('.note-content') || {}).value || el.textContent || ''
+      }));
+    }
+    function filterNotes(query) {
+      const notes = getAllNotes();
+      const q = query.trim().toLowerCase();
+      if (!q) { notes.forEach(n => n.el.classList.remove('search-hidden')); searchCount.textContent = ''; searchClear.classList.remove('show'); return; }
+      searchClear.classList.add('show');
+      let count = 0;
+      notes.forEach(n => { const text = n.content.toLowerCase(); if (text.includes(q)) { n.el.classList.remove('search-hidden'); count++; } else { n.el.classList.add('search-hidden'); } });
+      searchCount.textContent = `${count}/${notes.length}`;
+    }
+    searchInput.addEventListener('input', () => filterNotes(searchInput.value));
+    searchClear.addEventListener('click', () => { searchInput.value = ''; filterNotes(''); searchInput.focus(); });
+    searchInput.addEventListener('keydown', e => { if (e.key === 'Escape') { searchInput.value = ''; filterNotes(''); searchInput.blur(); } });
+
+    // ============ 文本工具箱 ============
+    function openWebToolbox() {
+      if (toolboxPanel) { closeWebToolbox(); return; }
+      if (!activeTextarea) return;
+      undoStack = [];
+
+      const panel = document.createElement('div');
+      panel.className = 'web-toolbox';
+      panel.innerHTML = `
+        <div class="wtb-header">
+          <span class="wtb-title">🧰 文本工具</span>
+          <div class="wtb-header-actions">
+            <button class="wtb-copy" title="复制全部内容">📋 复制</button>
+            <button class="wtb-clear" title="清空内容">🗑 清空</button>
+            <button class="wtb-undo" title="无可撤回操作" disabled>↩ 撤回</button>
+            <button class="wtb-close" title="关闭">✕</button>
+          </div>
+        </div>
+        <div class="wtb-stats"></div>
+        <div class="wtb-groups"></div>
+      `;
+      const groups = panel.querySelector('.wtb-groups');
+      TOOL_GROUPS.forEach(group => {
+        const g = document.createElement('div'); g.className = 'wtb-group';
+        const label = document.createElement('div'); label.className = 'wtb-group-title'; label.textContent = group.title; g.appendChild(label);
+        const btns = document.createElement('div'); btns.className = 'wtb-btns';
+        group.items.forEach(item => {
+          const b = document.createElement('button'); b.className = 'wtb-btn'; b.textContent = item.label;
+          b.addEventListener('click', () => applyWebTool(TEXT_TOOLS[item.key]));
+          btns.appendChild(b);
+        });
+        g.appendChild(btns); groups.appendChild(g);
+      });
+
+      panel.querySelector('.wtb-close').addEventListener('click', closeWebToolbox);
+      panel.querySelector('.wtb-copy').addEventListener('click', () => {
+        const text = activeTextarea.value;
+        navigator.clipboard.writeText(text).catch(() => { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); });
+      });
+      panel.querySelector('.wtb-clear').addEventListener('click', () => {
+        pushUndoSnapshot(activeTextarea);
+        activeTextarea.value = '';
+        saveContent('');
+        refreshWebToolboxStats();
+      });
+      panel.querySelector('.wtb-undo').addEventListener('click', undoLastEdit);
+      document.body.appendChild(panel);
+      setTimeout(() => panel.classList.add('show'), 10);
+      toolboxPanel = panel;
+      activeTextarea.addEventListener('select', refreshWebToolboxStats);
+      activeTextarea.addEventListener('keyup', refreshWebToolboxStats);
+      activeTextarea.addEventListener('click', refreshWebToolboxStats);
+      refreshWebToolboxStats();
+    }
+
+    function closeWebToolbox() {
+      if (toolboxPanel) { toolboxPanel.classList.remove('show'); setTimeout(() => { if (toolboxPanel) { toolboxPanel.remove(); toolboxPanel = null; } }, 300); }
+    }
+
+    function refreshWebToolboxStats() {
+      if (!toolboxPanel || !activeTextarea) return;
+      const statsEl = toolboxPanel.querySelector('.wtb-stats');
+      if (!statsEl) return;
+      const s = activeTextarea.selectionStart, e = activeTextarea.selectionEnd;
+      const hasSel = s !== e;
+      const text = hasSel ? activeTextarea.value.slice(s, e) : activeTextarea.value;
+      const st = textStats(text);
+      const label = hasSel ? '选区' : '全文';
+      statsEl.innerHTML = `<span class="wtb-stats-line">${label}: ${st.chars}字符 | ${st.charsNoSpace}字符(无空格) | ${st.words}词 | ${st.chinese}中文 | ${st.digits}数字 | ${st.lines}行</span>`;
+    }
+
+    function pushUndoSnapshot(ta) {
+      if (!ta) return;
+      undoStack.push({ value: ta.value, selectionStart: ta.selectionStart, selectionEnd: ta.selectionEnd });
+      if (undoStack.length > 50) undoStack.shift();
+      updateWebUndoButton();
+    }
+    function undoLastEdit() {
+      if (!activeTextarea || undoStack.length === 0) return;
+      const snap = undoStack.pop();
+      activeTextarea.value = snap.value;
+      activeTextarea.focus();
+      activeTextarea.selectionStart = snap.selectionStart;
+      activeTextarea.selectionEnd = snap.selectionEnd;
+      saveContent(activeTextarea.value);
+      refreshWebToolboxStats();
+      updateWebUndoButton();
+    }
+    function updateWebUndoButton() {
+      if (!toolboxPanel) return;
+      const btn = toolboxPanel.querySelector('.wtb-undo');
+      if (btn) { btn.disabled = undoStack.length === 0; btn.title = undoStack.length ? `撤回（${undoStack.length}步）` : '无可撤回操作'; }
+    }
+
+    async function applyWebTool(fn) {
+      if (!activeTextarea) return;
+      const s = activeTextarea.selectionStart, e = activeTextarea.selectionEnd;
+      const hasSel = s !== e;
+      const original = hasSel ? activeTextarea.value.slice(s, e) : activeTextarea.value;
+      pushUndoSnapshot(activeTextarea);
+      const result = await fn(original);
+      if (typeof result === 'string' && result.startsWith('__QR_CODE_DATA_URL__')) {
+        const dataURL = result.slice('__QR_CODE_DATA_URL__'.length);
+        const x = 100 + Math.random() * (window.innerWidth - 350);
+        const y = 100 + Math.random() * (window.innerHeight - 300);
+        await fetch('/api/notes', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({type:'image', content:dataURL, x, y, color:'#ffffff'}) });
+        return;
+      }
+      if (typeof result === 'string') {
+        if (hasSel) {
+          activeTextarea.value = activeTextarea.value.slice(0, s) + result + activeTextarea.value.slice(e);
+          activeTextarea.selectionStart = s;
+          activeTextarea.selectionEnd = s + result.length;
+        } else {
+          activeTextarea.value = result;
+        }
+        activeTextarea.focus();
+        saveContent(activeTextarea.value);
+        refreshWebToolboxStats();
+      }
+    }
+
+    function saveContent(content) {
+      if (!activeNoteId) return;
+      fetch('/api/notes/' + activeNoteId, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({content}) });
+    }
+
+    // ============ 查找替换 ============
+    function openFindReplace() {
+      if (findReplacePanel) { closeFindReplace(); return; }
+      if (!activeTextarea) return;
+      const panel = document.createElement('div');
+      panel.className = 'find-replace';
+      panel.innerHTML = `
+        <div class="fr-header"><span class="fr-title">🔍 查找替换</span><button class="fr-close" title="关闭">✕</button></div>
+        <input class="fr-find" type="text" placeholder="查找内容">
+        <input class="fr-replace" type="text" placeholder="替换为">
+        <div class="fr-opts">
+          <label><input type="checkbox" class="fr-regex"> 正则</label>
+          <label><input type="checkbox" class="fr-case"> 区分大小写</label>
+        </div>
+        <div class="fr-actions">
+          <button class="fr-btn fr-replace-first">替换</button>
+          <button class="fr-btn fr-replace-all">全部替换</button>
+        </div>
+        <div class="fr-status"></div>
+      `;
+      panel.querySelector('.fr-close').addEventListener('click', closeFindReplace);
+      panel.querySelector('.fr-replace-first').addEventListener('click', () => doReplace('first'));
+      panel.querySelector('.fr-replace-all').addEventListener('click', () => doReplace('all'));
+      document.body.appendChild(panel);
+      setTimeout(() => panel.classList.add('show'), 10);
+      findReplacePanel = panel;
+      panel.querySelector('.fr-find').focus();
+    }
+    function closeFindReplace() {
+      if (findReplacePanel) { findReplacePanel.classList.remove('show'); setTimeout(() => { if (findReplacePanel) { findReplacePanel.remove(); findReplacePanel = null; } }, 300); }
+    }
+    function doReplace(scope) {
+      if (!activeTextarea || !findReplacePanel) return;
+      const findVal = findReplacePanel.querySelector('.fr-find').value;
+      const replaceVal = findReplacePanel.querySelector('.fr-replace').value;
+      const useRegex = findReplacePanel.querySelector('.fr-regex').checked;
+      const caseSensitive = findReplacePanel.querySelector('.fr-case').checked;
+      const statusEl = findReplacePanel.querySelector('.fr-status');
+      if (findVal === '') { statusEl.textContent = '请输入查找内容'; return; }
+      const { selectionStart: s, selectionEnd: e, value } = activeTextarea;
+      const hasSelection = s !== e;
+      const target = hasSelection ? value.slice(s, e) : value;
+      let pattern;
+      try {
+        const flags = (scope === 'all' ? 'g' : '') + (caseSensitive ? '' : 'i');
+        pattern = useRegex ? new RegExp(findVal, flags) : new RegExp(findVal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
+      } catch (err) { statusEl.textContent = '正则错误: ' + err.message; return; }
+      const countPattern = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g');
+      const count = (target.match(countPattern) || []).length;
+      if (count === 0) { statusEl.textContent = '未找到匹配项'; return; }
+      pushUndoSnapshot(activeTextarea);
+      const replaced = target.replace(pattern, replaceVal);
+      activeTextarea.value = hasSelection ? value.slice(0, s) + replaced + value.slice(e) : replaced;
+      activeTextarea.focus();
+      saveContent(activeTextarea.value);
+      refreshWebToolboxStats();
+      statusEl.textContent = `已替换 ${scope === 'all' ? count : 1} 处`;
+    }
+
+    // ============ RSA 面板 ============
+    function openRsaPanel() {
+      if (rsaPanel) { closeRsaPanel(); return; }
+      const panel = document.createElement('div');
+      panel.className = 'rsa-panel';
+      panel.innerHTML = `
+        <div class="rsa-header"><span class="rsa-title">🔐 RSA 加解密</span><button class="rsa-close" title="关闭">✕</button></div>
+        <div class="rsa-info">RSA 2048 位 · NoPadding · 兼容 Java</div>
+        <div class="rsa-actions"><button class="rsa-btn rsa-gen">🔑 生成密钥对</button></div>
+        <textarea class="rsa-key rsa-pub" placeholder="公钥 (PEM)"></textarea>
+        <textarea class="rsa-key rsa-priv" placeholder="私钥 (PEM)"></textarea>
+        <div class="rsa-actions">
+          <button class="rsa-btn rsa-enc">🔒 加密</button>
+          <button class="rsa-btn rsa-dec">🔓 解密</button>
+        </div>
+        <div class="rsa-batch-opt"><input type="checkbox" class="rsa-batch"> 逐行批量处理</div>
+        <div class="rsa-status"></div>
+      `;
+      panel.querySelector('.rsa-close').addEventListener('click', closeRsaPanel);
+      panel.querySelector('.rsa-gen').addEventListener('click', async () => {
+        try {
+          const keys = await rsaGenerateKeyPair();
+          panel.querySelector('.rsa-pub').value = keys.publicKey;
+          panel.querySelector('.rsa-priv').value = keys.privateKey;
+          panel.querySelector('.rsa-status').textContent = '密钥对已生成';
+        } catch (err) { panel.querySelector('.rsa-status').textContent = '错误: ' + err.message; }
+      });
+      panel.querySelector('.rsa-enc').addEventListener('click', () => {
+        try {
+          const pub = panel.querySelector('.rsa-pub').value;
+          const batch = panel.querySelector('.rsa-batch').checked;
+          const input = activeTextarea ? activeTextarea.value : '';
+          const result = batch ? input.split('\n').map(l => l.trim() ? rsaEncrypt(l, pub) : l).join('\n') : rsaEncrypt(input, pub);
+          if (activeTextarea) { pushUndoSnapshot(activeTextarea); activeTextarea.value = result; saveContent(result); }
+          panel.querySelector('.rsa-status').textContent = '加密完成';
+        } catch (err) { panel.querySelector('.rsa-status').textContent = '错误: ' + err.message; }
+      });
+      panel.querySelector('.rsa-dec').addEventListener('click', () => {
+        try {
+          const priv = panel.querySelector('.rsa-priv').value;
+          const batch = panel.querySelector('.rsa-batch').checked;
+          const input = activeTextarea ? activeTextarea.value : '';
+          const result = batch ? input.split('\n').map(l => l.trim() ? rsaDecrypt(l, priv) : l).join('\n') : rsaDecrypt(input, priv);
+          if (activeTextarea) { pushUndoSnapshot(activeTextarea); activeTextarea.value = result; saveContent(result); }
+          panel.querySelector('.rsa-status').textContent = '解密完成';
+        } catch (err) { panel.querySelector('.rsa-status').textContent = '错误: ' + err.message; }
+      });
+      document.body.appendChild(panel);
+      setTimeout(() => panel.classList.add('show'), 10);
+      rsaPanel = panel;
+    }
+    function closeRsaPanel() { if (rsaPanel) { rsaPanel.classList.remove('show'); setTimeout(() => { if (rsaPanel) { rsaPanel.remove(); rsaPanel = null; } }, 300); } }
+
+    // ============ Excel 模板 ============
+    let excelData = null;
+    function openExcelTemplate() {
+      if (excelTemplatePanel) { closeExcelTemplate(); return; }
+      const panel = document.createElement('div');
+      panel.className = 'excel-template';
+      panel.innerHTML = `
+        <div class="et-header"><span class="et-title">📊 Excel 模板生成</span><button class="et-close" title="关闭">✕</button></div>
+        <button class="et-upload-btn">📁 上传 Excel 文件</button>
+        <div class="et-info">上传 Excel 文件后，点击列名插入占位符，生成模板文本。</div>
+        <div class="et-columns"></div>
+        <textarea class="et-template" placeholder="输入模板，如：INSERT INTO table (name) VALUES ('{name}')"></textarea>
+        <div class="et-actions">
+          <button class="et-btn et-generate">⚡ 生成</button>
+          <button class="et-btn et-preview-btn">👁 预览</button>
+        </div>
+        <div class="et-preview"></div>
+      `;
+      panel.querySelector('.et-close').addEventListener('click', closeExcelTemplate);
+      panel.querySelector('.et-upload-btn').addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file'; input.accept = '.xlsx,.xls,.csv';
+        input.addEventListener('change', () => {
+          const file = input.files[0]; if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            try {
+              const wb = XLSX.read(e.target.result, { type: 'array' });
+              const ws = wb.Sheets[wb.SheetNames[0]];
+              excelData = XLSX.utils.sheet_to_json(ws);
+              const cols = Object.keys(excelData[0] || {});
+              const colsEl = panel.querySelector('.et-columns');
+              colsEl.innerHTML = '';
+              cols.forEach(col => {
+                const chip = document.createElement('span'); chip.className = 'et-col-chip'; chip.textContent = col;
+                chip.addEventListener('click', () => {
+                  const ta = panel.querySelector('.et-template');
+                  const pos = ta.selectionStart;
+                  ta.value = ta.value.slice(0, pos) + '{' + col + '}' + ta.value.slice(pos);
+                  ta.focus();
+                });
+                colsEl.appendChild(chip);
+              });
+              panel.querySelector('.et-info').textContent = `已加载 ${excelData.length} 行数据，${cols.length} 列`;
+            } catch (err) { panel.querySelector('.et-info').textContent = '解析失败: ' + err.message; }
+          };
+          reader.readAsArrayBuffer(file);
+        });
+        input.click();
+      });
+      panel.querySelector('.et-generate').addEventListener('click', () => {
+        if (!excelData || !activeTextarea) return;
+        const tpl = panel.querySelector('.et-template').value;
+        const result = excelData.map(row => {
+          let line = tpl;
+          Object.entries(row).forEach(([k, v]) => { line = line.replace(new RegExp('\\{' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\}', 'g'), String(v ?? '')); });
+          return line;
+        }).join('\n');
+        pushUndoSnapshot(activeTextarea);
+        activeTextarea.value = result;
+        saveContent(result);
+      });
+      panel.querySelector('.et-preview-btn').addEventListener('click', () => {
+        if (!excelData) return;
+        const tpl = panel.querySelector('.et-template').value;
+        const row = excelData[0];
+        let line = tpl;
+        Object.entries(row).forEach(([k, v]) => { line = line.replace(new RegExp('\\{' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\}', 'g'), String(v ?? '')); });
+        panel.querySelector('.et-preview').textContent = line;
+      });
+      document.body.appendChild(panel);
+      setTimeout(() => panel.classList.add('show'), 10);
+      excelTemplatePanel = panel;
+    }
+    function closeExcelTemplate() { if (excelTemplatePanel) { excelTemplatePanel.classList.remove('show'); setTimeout(() => { if (excelTemplatePanel) { excelTemplatePanel.remove(); excelTemplatePanel = null; } }, 300); } }
+
+    // ============ Markdown 预览 ============
+    function toggleMarkdownPreview() {
+      if (!activeTextarea) return;
+      if (markdownPreviewActive) {
+        if (markdownPreviewContainer) { markdownPreviewContainer.remove(); markdownPreviewContainer = null; }
+        activeTextarea.style.display = '';
+        markdownPreviewActive = false;
+      } else {
+        markdownPreviewActive = true;
+        activeTextarea.style.display = 'none';
+        markdownPreviewContainer = document.createElement('div');
+        markdownPreviewContainer.className = 'markdown-preview';
+        markdownPreviewContainer.innerHTML = marked.parse(activeTextarea.value || '*暂无内容*');
+        activeTextarea.parentNode.appendChild(markdownPreviewContainer);
+        markdownPreviewContainer.addEventListener('click', () => toggleMarkdownPreview());
+      }
+    }
+
+    // ============ 打开工具箱（带完整功能） ============
+    function openWebToolbox() {
+      if (toolboxPanel) { closeWebToolbox(); return; }
+      if (!activeTextarea) return;
+      undoStack = [];
+
+      const panel = document.createElement('div');
+      panel.className = 'web-toolbox';
+      panel.innerHTML = `
+        <div class="wtb-header">
+          <span class="wtb-title">🧰 文本工具</span>
+          <div class="wtb-header-actions">
+            <button class="wtb-copy" title="复制全部">📋</button>
+            <button class="wtb-clear" title="清空">🗑</button>
+            <button class="wtb-undo" title="撤回" disabled>↩</button>
+            <button class="wtb-close" title="关闭">✕</button>
+          </div>
+        </div>
+        <div class="wtb-stats"></div>
+        <div class="wtb-groups"></div>
+      `;
+      const groups = panel.querySelector('.wtb-groups');
+      TOOL_GROUPS.forEach(group => {
+        const g = document.createElement('div'); g.className = 'wtb-group';
+        const label = document.createElement('div'); label.className = 'wtb-group-title'; label.textContent = group.title; g.appendChild(label);
+        const btns = document.createElement('div'); btns.className = 'wtb-btns';
+        group.items.forEach(item => {
+          const b = document.createElement('button'); b.className = 'wtb-btn'; b.textContent = item.label;
+          b.addEventListener('click', () => applyWebTool(TEXT_TOOLS[item.key]));
+          btns.appendChild(b);
+        });
+        g.appendChild(btns); groups.appendChild(g);
+      });
+
+      // 附加功能按钮
+      const extraGroup = document.createElement('div'); extraGroup.className = 'wtb-group';
+      extraGroup.innerHTML = `<div class="wtb-group-title">高级功能</div>`;
+      const extraBtns = document.createElement('div'); extraBtns.className = 'wtb-btns';
+      [{label:'🔍 查找替换', fn: openFindReplace}, {label:'🔐 RSA加解密', fn: openRsaPanel}, {label:'📊 Excel模板', fn: openExcelTemplate}, {label:'📝 Markdown预览', fn: toggleMarkdownPreview}].forEach(item => {
+        const b = document.createElement('button'); b.className = 'wtb-btn'; b.textContent = item.label;
+        b.addEventListener('click', item.fn);
+        extraBtns.appendChild(b);
+      });
+      extraGroup.appendChild(extraBtns); groups.appendChild(extraGroup);
+
+      panel.querySelector('.wtb-close').addEventListener('click', closeWebToolbox);
+      panel.querySelector('.wtb-copy').addEventListener('click', () => {
+        navigator.clipboard.writeText(activeTextarea.value).catch(() => { const ta = document.createElement('textarea'); ta.value = activeTextarea.value; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); });
+      });
+      panel.querySelector('.wtb-clear').addEventListener('click', () => {
+        pushUndoSnapshot(activeTextarea); activeTextarea.value = ''; saveContent(''); refreshWebToolboxStats();
+      });
+      panel.querySelector('.wtb-undo').addEventListener('click', undoLastEdit);
+      document.body.appendChild(panel);
+      setTimeout(() => panel.classList.add('show'), 10);
+      toolboxPanel = panel;
+      activeTextarea.addEventListener('select', refreshWebToolboxStats);
+      activeTextarea.addEventListener('keyup', refreshWebToolboxStats);
+      activeTextarea.addEventListener('click', refreshWebToolboxStats);
+      refreshWebToolboxStats();
+    }
+
+    // ============ ESC 关闭所有面板 ============
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        closeWebToolbox(); closeFindReplace(); closeRsaPanel(); closeExcelTemplate();
+        toolbox.classList.remove('show');
+      }
+    });
+
+    // ============ 粘贴图片 ============
+    document.addEventListener('paste', async (e) => {
+      if (!activeNoteId) return;
+      const items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      const imageFiles = [];
+      for (const item of items) {
+        if (item.kind === 'file' && item.type.startsWith('image/')) {
+          const f = item.getAsFile();
+          if (f) imageFiles.push(f);
+        }
+      }
+      if (imageFiles.length === 0) return;
+      e.preventDefault();
+      for (const file of imageFiles) {
+        const fd = new FormData(); fd.append('file', file);
+        const res = await fetch('/api/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        const noteEl = document.getElementById('note-' + activeNoteId);
+        if (!noteEl) continue;
+        const note = { id: activeNoteId };
+        const existing = (() => { try { return JSON.parse(noteEl.querySelector('.note-content') ? '' : '[]'); } catch { return []; } })();
+        existing.push(data.url);
+        const content = JSON.stringify(existing);
+        await fetch('/api/notes/' + activeNoteId, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ type:'image', content }) });
+      }
+    });
+
+    // ============ 拖拽上传 ============
+    board.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+    board.addEventListener('drop', async e => {
+      e.preventDefault();
+      const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+      if (!files.length) return;
+      for (const file of files) {
+        const fd = new FormData(); fd.append('file', file);
+        const res = await fetch('/api/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        const x = e.clientX - 120; const y = e.clientY - 100;
+        await fetch('/api/notes', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({type:'image', content:data.url, x, y, color:COLORS[Math.floor(Math.random()*COLORS.length)]}) });
+      }
+    });
+
+    // ============ 实时同步 ============
     socket.on('note:created', n => renderNote(n));
     socket.on('note:deleted', ({ id }) => { const el = document.getElementById('note-' + id); if (el) el.remove(); });
     socket.on('note:updated', n => {
@@ -168,11 +903,9 @@
       if (ta && document.hasFocus() && document.activeElement === ta) return;
       el.style.left = n.x+'px'; el.style.top = n.y+'px';
       el.style.width = (n.width||240)+'px'; el.style.height = (n.height||200)+'px';
-      el.style.background = n.color;
-      el.style.color = isLight(n.color)?'#333':'#fff';
+      el.style.background = n.color; el.style.color = isLight(n.color)?'#333':'#fff';
       if (ta && ta.value !== (n.content || '')) ta.value = n.content || '';
     });
-
     setInterval(async () => {
       try {
         const res = await fetch('/api/notes');
@@ -184,20 +917,20 @@
           if (ta && document.hasFocus() && document.activeElement === ta) return;
           el.style.left = n.x+'px'; el.style.top = n.y+'px';
           el.style.width = (n.width||240)+'px'; el.style.height = (n.height||200)+'px';
-          el.style.background = n.color;
-          el.style.color = isLight(n.color)?'#333':'#fff';
+          el.style.background = n.color; el.style.color = isLight(n.color)?'#333':'#fff';
           if (ta && ta.value !== (n.content || '')) ta.value = n.content || '';
         });
-        document.querySelectorAll('.note').forEach(el => {
-          const id = el.id.replace('note-', '');
-          if (!notes.find(n => n.id === id)) el.remove();
-        });
+        document.querySelectorAll('.note').forEach(el => { const id = el.id.replace('note-', ''); if (!notes.find(n => n.id === id)) el.remove(); });
       } catch (e) {}
     }, 3000);
 
-    function showPreview(src) { const o = document.createElement('div'); o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;z-index:99999;cursor:pointer'; o.innerHTML=`<img src="${src}" style="max-width:90vw;max-height:90vh;border-radius:8px">`; o.onclick=()=>o.remove(); document.body.appendChild(o); }
-    function isLight(h) { const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16); return (r*299+g*587+b*114)/1000>150; }
-    function esc(s) { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+    function showPreview(src) {
+      const o = document.createElement('div');
+      o.className = 'image-overlay';
+      o.innerHTML = `<img src="${src}">`;
+      o.addEventListener('click', () => o.remove());
+      document.body.appendChild(o);
+    }
 
     loadNotes();
   </script>

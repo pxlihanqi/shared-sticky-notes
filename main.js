@@ -91,8 +91,8 @@ function startLocalServer() {
   });
   const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
 
-  expressApp.use(express.static(path.join(__dirname, 'public')));
-  expressApp.use('/uploads', express.static(uploadsDir));
+    expressApp.use(express.static(path.join(__dirname, 'public'), { etag: false, lastModified: false, maxAge: 0 }));
+    expressApp.use('/uploads', express.static(uploadsDir));
   expressApp.use(express.json());
 
   // 应用验证码中间件到所有 API 路由
@@ -243,12 +243,41 @@ ipcMain.on('note:minimize', (e, noteId) => {
   }
 });
 
+ipcMain.on('note:maximize', (e, noteId) => {
+  const win = noteWindows.get(noteId);
+  if (win && !win.isDestroyed()) {
+    if (win.isMaximized()) {
+      win.unmaximize();
+    } else {
+      win.maximize();
+    }
+  }
+});
+
+ipcMain.on('note:focus', (e, noteId) => {
+  const win = noteWindows.get(noteId);
+  if (win && !win.isDestroyed()) {
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+  }
+});
+
 ipcMain.on('note:togglePin', (e, noteId) => {
   const win = noteWindows.get(noteId);
   if (win && !win.isDestroyed()) {
     const current = win.isAlwaysOnTop();
     win.setAlwaysOnTop(!current);
     e.returnValue = !current; // 同步返回新状态
+  } else {
+    e.returnValue = false;
+  }
+});
+
+ipcMain.on('note:isPinned', (e, noteId) => {
+  const win = noteWindows.get(noteId);
+  if (win && !win.isDestroyed()) {
+    e.returnValue = win.isAlwaysOnTop();
   } else {
     e.returnValue = false;
   }

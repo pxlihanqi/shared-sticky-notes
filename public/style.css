@@ -46,7 +46,7 @@ body {
   height: 22px;
   border-radius: 50%;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1;
   display: flex;
   align-items: center;
@@ -78,6 +78,44 @@ body {
 
 #pinBtn.pinned:hover {
   background: rgba(255, 193, 7, 0.9);
+}
+
+/* 工具箱下拉菜单 */
+.toolbox-dropdown {
+  display: none;
+  position: absolute;
+  top: 30px;
+  right: 4px;
+  background: rgba(22, 33, 62, 0.98);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 200;
+  -webkit-app-region: no-drag;
+  min-width: 120px;
+}
+
+.toolbox-dropdown.show {
+  display: block;
+}
+
+.dropdown-item {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: #fff;
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.dropdown-item:hover {
+  background: rgba(76, 175, 80, 0.6);
 }
 
 .note-body {
@@ -197,7 +235,7 @@ body {
 
 .color-picker {
   position: absolute;
-  bottom: 8px;
+  bottom: 28px;
   left: 8px;
   display: flex;
   flex-wrap: wrap;
@@ -269,6 +307,367 @@ body {
 
 .note-body::-webkit-scrollbar { width: 3px; }
 .note-body::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 2px; }
+
+.note-status {
+  position: absolute;
+  bottom: 6px;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  opacity: 0.6;
+  z-index: 50;
+  -webkit-app-region: no-drag;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4caf50;
+  transition: background 0.3s;
+}
+
+.note-status.offline .status-dot {
+  background: #f44336;
+}
+
+.note-status.offline .status-text {
+  color: #f44336;
+}
+
+.status-text {
+  opacity: 0.8;
+}
+
+/* 定时提醒按钮 */
+#remindBtn.remind-active {
+  background: rgba(255, 152, 0, 0.7);
+  opacity: 1;
+}
+
+/* 提醒面板 */
+.remind-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 280px;
+  background: rgba(22, 33, 62, 0.98);
+  color: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  z-index: 10002;
+  overflow: hidden;
+}
+
+.remind-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.remind-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.remind-close {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: #fff;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.remind-close:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.remind-body {
+  padding: 12px 14px;
+}
+
+.remind-label {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.remind-inputs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.remind-date,
+.remind-time {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 5px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+}
+
+.remind-date:focus,
+.remind-time:focus {
+  border-color: rgba(255, 152, 0, 0.75);
+}
+
+.remind-date::-webkit-calendar-picker-indicator,
+.remind-time::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+.remind-msg {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+  margin-bottom: 10px;
+}
+
+.remind-msg:focus {
+  border-color: rgba(255, 152, 0, 0.75);
+}
+
+.remind-msg::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.remind-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.remind-btn {
+  flex: 1;
+  border: none;
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.15s;
+}
+
+.remind-set {
+  background: rgba(255, 152, 0, 0.7);
+}
+
+.remind-set:hover {
+  background: rgba(255, 152, 0, 0.9);
+}
+
+.remind-cancel {
+  background: rgba(158, 158, 158, 0.5);
+}
+
+.remind-cancel:hover {
+  background: rgba(158, 158, 158, 0.8);
+}
+
+.remind-status {
+  font-size: 10px;
+  opacity: 0.7;
+  margin-top: 6px;
+  min-height: 14px;
+}
+
+/* 提醒通知弹窗 */
+.remind-notify {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+}
+
+.remind-notify-box {
+  background: #fff;
+  color: #333;
+  border-radius: 16px;
+  padding: 24px 32px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  min-width: 240px;
+}
+
+.remind-notify-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.remind-notify-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.remind-notify-msg {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 16px;
+  word-break: break-word;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.remind-notify-ok {
+  background: #ff9800;
+  color: #fff;
+  border: none;
+  padding: 8px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.remind-notify-ok:hover {
+  background: #f57c00;
+}
+
+/* 搜索面板 */
+.search-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 320px;
+  height: 100vh;
+  overflow-y: auto;
+  background: rgba(22, 33, 62, 0.98);
+  color: #fff;
+  padding: 12px 14px 20px;
+  -webkit-app-region: no-drag;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3);
+  z-index: 10003;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.search-panel.show {
+  transform: translateX(0);
+}
+
+.sp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.sp-title {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.sp-close {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: #fff;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.sp-close:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.sp-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  outline: none;
+  margin-bottom: 12px;
+}
+
+.sp-input:focus {
+  border-color: rgba(76, 175, 80, 0.75);
+}
+
+.sp-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.sp-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sp-empty {
+  text-align: center;
+  opacity: 0.5;
+  font-size: 12px;
+  padding: 20px 0;
+}
+
+.sp-item {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.sp-item:hover {
+  transform: translateX(-2px);
+  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.sp-item-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.sp-item-content {
+  font-size: 12px;
+  line-height: 1.5;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+}
+
+.sp-item-content mark {
+  background: rgba(255, 193, 7, 0.6);
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+.search-panel::-webkit-scrollbar { width: 4px; }
+.search-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
 
 /* 文本百宝箱 - 侧边栏模式 */
 .toolbox {

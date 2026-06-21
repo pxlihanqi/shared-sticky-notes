@@ -9,15 +9,25 @@
 <body>
   <div class="note-card" id="noteCard">
     <div class="note-ops">
-      <button class="op-btn" id="addBtn" title="新增便签">+</button>
-      <button class="op-btn" id="imgBtn" title="添加图片">⊞</button>
-      <button class="op-btn" id="colorBtn" title="换颜色">◐</button>
-      <button class="op-btn" id="toolBtn" title="文本工具箱">⚙</button>
-      <button class="op-btn" id="pinBtn" title="置顶">⊙</button>
-      <button class="op-btn" id="minBtn" title="最小化">—</button>
+      <button class="op-btn" id="addBtn" title="新增便签">＋</button>
+      <button class="op-btn" id="colorBtn" title="换颜色">🎨</button>
+      <button class="op-btn" id="toolBtn" title="文本工具箱">🧰</button>
+      <button class="op-btn" id="pinBtn" title="置顶">📌</button>
+      <button class="op-btn" id="moreBtn" title="更多工具">⋯</button>
+      <button class="op-btn" id="maxBtn" title="最大化">⛶</button>
+      <button class="op-btn" id="minBtn" title="最小化">－</button>
       <button class="op-btn" id="closeBtn" title="删除">✕</button>
     </div>
+    <div class="toolbox-dropdown" id="toolboxDropdown">
+      <button class="dropdown-item" data-action="search">🔍 搜索便签</button>
+      <button class="dropdown-item" data-action="image">🖼 上传图片</button>
+      <button class="dropdown-item" data-action="remind">⏰ 定时提醒</button>
+    </div>
     <div class="note-body" id="noteBody"></div>
+    <div class="note-status" id="noteStatus">
+      <span class="status-dot"></span>
+      <span class="status-text">在线</span>
+    </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>

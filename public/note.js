@@ -208,6 +208,74 @@ document.getElementById('addBtn').addEventListener('click', () => {
   }
 });
 
+// ============ 搜索便签 ============
+
+let searchPanel = null;
+
+function toggleSearchPanel() {
+  if (searchPanel) {
+    searchPanel.classList.remove('show');
+    setTimeout(() => { if (searchPanel) { searchPanel.remove(); searchPanel = null; } }, 300);
+    return;
+  }
+
+  searchPanel = document.createElement('div');
+  searchPanel.className = 'search-panel';
+  searchPanel.innerHTML = `
+    <div class="sp-header">
+      <span class="sp-title">🔍 搜索便签</span>
+      <button class="sp-close" title="关闭">✕</button>
+    </div>
+    <input class="sp-input" type="text" placeholder="输入关键词搜索...">
+    <div class="sp-results"></div>
+  `;
+
+  const input = searchPanel.querySelector('.sp-input');
+  const results = searchPanel.querySelector('.sp-results');
+
+  async function doSearch(query) {
+    if (!query.trim()) { results.innerHTML = ''; return; }
+    try {
+      const res = await fetch(`${SERVER}/api/notes`, { headers: getAuthHeaders() });
+      const notes = await res.json();
+      const q = query.toLowerCase();
+      const matched = notes.filter(n => (n.content || '').toLowerCase().includes(q));
+      if (matched.length === 0) {
+        results.innerHTML = '<div class="sp-empty">未找到匹配的便签</div>';
+        return;
+      }
+      results.innerHTML = matched.map(n => {
+        const typeIcon = { text: '📝', image: '🖼', file: '📄' }[n.type] || '📝';
+        const preview = (n.content || '').replace(new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), m => `<mark>${m}</mark>`).slice(0, 100);
+        return `<div class="sp-item" data-id="${n.id}" style="background:${n.color};color:${isLight(n.color)?'#333':'#fff'}">
+          <span class="sp-item-icon">${typeIcon}</span>
+          <div class="sp-item-content">${preview}</div>
+        </div>`;
+      }).join('');
+
+      results.querySelectorAll('.sp-item').forEach(item => {
+        item.addEventListener('click', () => {
+          if (window.electronAPI) {
+            window.electronAPI.focusNote(item.dataset.id);
+          }
+        });
+      });
+    } catch (e) {
+      results.innerHTML = '<div class="sp-empty">搜索失败</div>';
+    }
+  }
+
+  let searchTimer;
+  input.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => doSearch(input.value), 300);
+  });
+
+  searchPanel.querySelector('.sp-close').addEventListener('click', toggleSearchPanel);
+  document.body.appendChild(searchPanel);
+  setTimeout(() => { searchPanel.classList.add('show'); input.focus(); }, 10);
+}
+
 // 上传若干图片文件并追加到当前便签（图片便签则追加，否则转为图片便签）
 async function uploadAndAppendImages(files) {
   const list = Array.from(files || []).filter(f => f && f.type && f.type.startsWith('image/'));
@@ -239,12 +307,12 @@ async function uploadAndAppendImages(files) {
   currentNote.type = 'image'; currentNote.content = content; renderNote();
 }
 
-document.getElementById('imgBtn').addEventListener('click', () => {
+function triggerImageUpload() {
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*'; input.multiple = true;
   input.addEventListener('change', () => uploadAndAppendImages(input.files));
   input.click();
-});
+}
 
 // 粘贴图片：从剪贴板读取图片直接添加到便签
 document.addEventListener('paste', (e) => {
@@ -338,9 +406,20 @@ if (minBtn) {
   });
 }
 
+const maxBtn = document.getElementById('maxBtn');
+if (maxBtn) {
+  maxBtn.addEventListener('click', () => {
+    if (window.electronAPI && window.electronAPI.maximizeNote) {
+      window.electronAPI.maximizeNote(noteId);
+    }
+  });
+}
+
 const pinBtn = document.getElementById('pinBtn');
 if (pinBtn) {
-  let isPinned = false;
+  let isPinned = window.electronAPI && window.electronAPI.isPinned ? window.electronAPI.isPinned(noteId) : false;
+  pinBtn.classList.toggle('pinned', isPinned);
+  pinBtn.title = isPinned ? '取消置顶' : '置顶';
   pinBtn.addEventListener('click', () => {
     if (window.electronAPI && window.electronAPI.togglePin) {
       isPinned = window.electronAPI.togglePin(noteId);
@@ -349,6 +428,133 @@ if (pinBtn) {
     }
   });
 }
+
+// ============ 定时提醒 ============
+
+let remindTimer = null;
+let remindTime = null;
+
+function showRemindPanel() {
+  const existing = document.querySelector('.remind-panel');
+  if (existing) { existing.remove(); return; }
+  if (!currentNote) return;
+
+  const panel = document.createElement('div');
+  panel.className = 'remind-panel';
+  const now = new Date();
+  const defaultTime = new Date(now.getTime() + 30 * 60000);
+  const timeStr = defaultTime.toTimeString().slice(0, 5);
+  const dateStr = defaultTime.toISOString().slice(0, 10);
+
+  panel.innerHTML = `
+    <div class="remind-header">
+      <span class="remind-title">⏰ 定时提醒</span>
+      <button class="remind-close" title="关闭">✕</button>
+    </div>
+    <div class="remind-body">
+      <label class="remind-label">提醒时间</label>
+      <div class="remind-inputs">
+        <input type="date" class="remind-date" value="${dateStr}">
+        <input type="time" class="remind-time" value="${timeStr}">
+      </div>
+      <label class="remind-label">提醒内容</label>
+      <input type="text" class="remind-msg" placeholder="输入提醒内容（可选）" value="${escapeHTML(currentNote.content || '').slice(0, 50)}">
+      <div class="remind-actions">
+        <button class="remind-btn remind-set">设置提醒</button>
+        <button class="remind-btn remind-cancel" style="display:none">取消提醒</button>
+      </div>
+      <div class="remind-status"></div>
+    </div>
+  `;
+
+  if (remindTime) {
+    const rt = new Date(remindTime);
+    panel.querySelector('.remind-date').value = rt.toISOString().slice(0, 10);
+    panel.querySelector('.remind-time').value = rt.toTimeString().slice(0, 5);
+    panel.querySelector('.remind-cancel').style.display = '';
+  }
+
+  panel.querySelector('.remind-close').addEventListener('click', () => panel.remove());
+
+  panel.querySelector('.remind-set').addEventListener('click', () => {
+    const date = panel.querySelector('.remind-date').value;
+    const time = panel.querySelector('.remind-time').value;
+    const msg = panel.querySelector('.remind-msg').value;
+    if (!date || !time) {
+      panel.querySelector('.remind-status').textContent = '请选择日期和时间';
+      return;
+    }
+    const target = new Date(`${date}T${time}`);
+    if (target <= new Date()) {
+      panel.querySelector('.remind-status').textContent = '时间必须在未来';
+      return;
+    }
+    setRemind(target.getTime(), msg);
+    panel.querySelector('.remind-status').textContent = `✅ 已设置 ${target.toLocaleString()} 提醒`;
+    panel.querySelector('.remind-cancel').style.display = '';
+    setTimeout(() => panel.remove(), 1500);
+  });
+
+  panel.querySelector('.remind-cancel').addEventListener('click', () => {
+    cancelRemind();
+    panel.querySelector('.remind-status').textContent = '已取消提醒';
+    panel.querySelector('.remind-cancel').style.display = 'none';
+    setTimeout(() => panel.remove(), 1000);
+  });
+
+  document.body.appendChild(panel);
+}
+
+function setRemind(timestamp, message) {
+  remindTime = timestamp;
+  clearTimeout(remindTimer);
+  updateRemindBtnUI();
+  checkRemind();
+}
+
+function cancelRemind() {
+  remindTime = null;
+  clearTimeout(remindTimer);
+  remindTimer = null;
+  updateRemindBtnUI();
+}
+
+function updateRemindBtnUI() {
+  // 按钮已移至下拉菜单，无需更新UI
+}
+
+function checkRemind() {
+  if (!remindTime) return;
+  const now = Date.now();
+  if (now >= remindTime) {
+    const msg = currentNote ? (currentNote.content || '').slice(0, 50) : '时间到了';
+    showRemindNotification(msg);
+    cancelRemind();
+    return;
+  }
+  const delay = Math.min(remindTime - now, 10000);
+  remindTimer = setTimeout(checkRemind, delay);
+}
+
+function showRemindNotification(message) {
+  const overlay = document.createElement('div');
+  overlay.className = 'remind-notify';
+  overlay.innerHTML = `
+    <div class="remind-notify-box">
+      <div class="remind-notify-icon">⏰</div>
+      <div class="remind-notify-title">定时提醒</div>
+      <div class="remind-notify-msg">${escapeHTML(message)}</div>
+      <button class="remind-notify-ok">知道了</button>
+    </div>
+  `;
+  overlay.querySelector('.remind-notify-ok').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+
+  try { new Audio('data:audio/wav;base64,UklGRl9vT19teleVBmb3JtYXQ=').play().catch(() => {}); } catch {}
+}
+
+if (remindTime) { checkRemind(); updateRemindBtnUI(); }
 
 // 保存便签内容到服务器，并同步本地状态
 async function saveContent(content) {
@@ -407,6 +613,102 @@ const TEXT_TOOLS = {
   // JSON类
   jsonFormat: (t) => { try { return JSON.stringify(JSON.parse(t), null, 2); } catch { return t; } },
   jsonMinify: (t) => { try { return JSON.stringify(JSON.parse(t)); } catch { return t; } },
+  // YAML 与 Properties 互转
+  yamlToProps: (t) => {
+    const lines = t.split('\n');
+    const result = [];
+    const stack = [];
+    for (const line of lines) {
+      const trimmed = line.replace(/\r$/, '');
+      const indentMatch = trimmed.match(/^(\s*)/);
+      const indent = indentMatch ? indentMatch[1].length : 0;
+      const kvMatch = trimmed.match(/^\s*([^:#][^:]*?):\s*(.*)$/);
+      if (!kvMatch) continue;
+      const key = kvMatch[1].trim();
+      const value = kvMatch[2].trim();
+      while (stack.length > 0 && stack[stack.length - 1].indent >= indent) stack.pop();
+      const fullKey = [...stack.map(s => s.key), key].join('.');
+      if (value === '' || value === '|' || value === '>' || value === '[]') {
+        stack.push({ indent, key });
+      } else {
+        let val = value;
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1);
+        }
+        result.push(`${fullKey}=${val}`);
+      }
+    }
+    return result.join('\n');
+  },
+  propsToYaml: (t) => {
+    const lines = t.split('\n').filter(l => l.trim() && !l.trim().startsWith('#') && !l.trim().startsWith('!'));
+    const root = {};
+    for (const line of lines) {
+      const match = line.match(/^([^=]+)=(.*)$/);
+      if (!match) continue;
+      const key = match[1].trim();
+      let value = match[2].trim();
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      const parts = key.split('.');
+      let current = root;
+      for (let i = 0; i < parts.length - 1; i++) {
+        if (!current[parts[i]]) current[parts[i]] = {};
+        current = current[parts[i]];
+      }
+      current[parts[parts.length - 1]] = value;
+    }
+    function toYaml(obj, indent = 0) {
+      const prefix = '  '.repeat(indent);
+      let result = '';
+      for (const [k, v] of Object.entries(obj)) {
+        if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+          result += `${prefix}${k}:\n${toYaml(v, indent + 1)}`;
+        } else {
+          const val = String(v);
+          const needQuote = /[:{}\[\],&*?|<>=!%@`#'"\n]/.test(val) || val.trim() !== val || val === '';
+          result += `${prefix}${k}: ${needQuote ? `"${val.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"` : val}\n`;
+        }
+      }
+      return result;
+    }
+    return toYaml(root).trimEnd();
+  },
+  // 全角半角转换
+  toFullWidth: (t) => {
+    return t.replace(/[！-～]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0xFEE0)).replace(/ /g, '　');
+  },
+  toHalfWidth: (t) => {
+    return t.replace(/[！-～]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0)).replace(/　/g, ' ');
+  },
+  // SQL类
+  sqlFormat: (t) => {
+    if (!t.trim()) return t;
+    const keywords = ['SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'ORDER BY', 'GROUP BY', 'HAVING', 'LIMIT', 'OFFSET', 'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE', 'JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'OUTER JOIN', 'ON', 'AS', 'DISTINCT', 'UNION', 'UNION ALL', 'CREATE', 'TABLE', 'ALTER', 'DROP', 'INDEX', 'PRIMARY KEY', 'FOREIGN KEY', 'REFERENCES', 'NOT NULL', 'DEFAULT', 'AUTO_INCREMENT', 'VARCHAR', 'INT', 'INTEGER', 'TEXT', 'BOOLEAN', 'DATE', 'DATETIME', 'TIMESTAMP', 'DECIMAL', 'FLOAT', 'DOUBLE', 'BLOB', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'IN', 'EXISTS', 'BETWEEN', 'LIKE', 'IS', 'NULL', 'ASC', 'DESC', 'FETCH', 'NEXT', 'ROWS', 'ONLY', 'WITH', 'RECURSIVE', 'OVER', 'PARTITION', 'ROW_NUMBER', 'RANK', 'DENSE_RANK', 'LAG', 'LEAD', 'FIRST_VALUE', 'LAST_VALUE'];
+    let result = t.replace(/\s+/g, ' ').trim();
+    const topKeywords = ['SELECT', 'FROM', 'WHERE', 'ORDER BY', 'GROUP BY', 'HAVING', 'LIMIT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'ALTER', 'DROP', 'WITH'];
+    topKeywords.forEach(kw => {
+      const regex = new RegExp('\\b(' + kw + ')\\b', 'gi');
+      result = result.replace(regex, '\n$1');
+    });
+    const midKeywords = ['AND', 'OR', 'ON', 'SET', 'VALUES', 'JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'OUTER JOIN', 'UNION', 'UNION ALL', 'FETCH', 'PARTITION'];
+    midKeywords.forEach(kw => {
+      const regex = new RegExp('\\b(' + kw + ')\\b', 'gi');
+      result = result.replace(regex, '\n  $1');
+    });
+    result = result.split('\n').map(line => {
+      let trimmed = line.trim();
+      if (!trimmed) return '';
+      keywords.forEach(kw => {
+        const regex = new RegExp('\\b' + kw + '\\b', 'gi');
+        trimmed = trimmed.replace(regex, kw);
+      });
+      return trimmed;
+    }).filter(l => l).join('\n');
+    return result;
+  },
+  sqlMinify: (t) => t.replace(/\s+/g, ' ').trim(),
   // 时间戳类
   timestampToDate: (t) => {
     const n = Number(t.trim());
@@ -541,6 +843,13 @@ const TOOL_GROUPS = [
     ],
   },
   {
+    title: '全角半角',
+    items: [
+      { key: 'toFullWidth', label: '转全角' },
+      { key: 'toHalfWidth', label: '转半角' },
+    ],
+  },
+  {
     title: '行操作',
     items: [
       { key: 'dedupeLines', label: '去重行' },
@@ -565,6 +874,20 @@ const TOOL_GROUPS = [
     items: [
       { key: 'jsonFormat', label: 'JSON格式化' },
       { key: 'jsonMinify', label: 'JSON压缩' },
+    ],
+  },
+  {
+    title: 'SQL',
+    items: [
+      { key: 'sqlFormat', label: 'SQL格式化' },
+      { key: 'sqlMinify', label: 'SQL压缩' },
+    ],
+  },
+  {
+    title: '配置转换',
+    items: [
+      { key: 'yamlToProps', label: 'YAML→Props' },
+      { key: 'propsToYaml', label: 'Props→YAML' },
     ],
   },
   {
@@ -1515,6 +1838,33 @@ if (toolboxBtn) {
   toolboxBtn.addEventListener('click', openToolbox);
 }
 
+// ============ 工具箱下拉菜单 ============
+const moreBtn = document.getElementById('moreBtn');
+const toolboxDropdown = document.getElementById('toolboxDropdown');
+
+if (moreBtn && toolboxDropdown) {
+  moreBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toolboxDropdown.classList.toggle('show');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!toolboxDropdown.contains(e.target) && e.target !== moreBtn) {
+      toolboxDropdown.classList.remove('show');
+    }
+  });
+
+  toolboxDropdown.querySelectorAll('.dropdown-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const action = item.dataset.action;
+      if (action === 'search') toggleSearchPanel();
+      else if (action === 'image') triggerImageUpload();
+      else if (action === 'remind') showRemindPanel();
+      toolboxDropdown.classList.remove('show');
+    });
+  });
+}
+
 // ============ Markdown 预览 ============
 
 let markdownPreviewActive = false;
@@ -1573,6 +1923,60 @@ function formatSize(bytes) {
 loadNote();
 setupDrag();
 setupOps();
+
+// ============ 连接状态监控 ============
+
+let isConnected = true;
+let statusCheckTimer = null;
+
+function updateStatusUI(online) {
+  const statusEl = document.getElementById('noteStatus');
+  if (!statusEl) return;
+  if (online) {
+    statusEl.classList.remove('offline');
+    statusEl.querySelector('.status-text').textContent = '在线';
+  } else {
+    statusEl.classList.add('offline');
+    statusEl.querySelector('.status-text').textContent = '离线';
+  }
+}
+
+async function checkConnection() {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch(`${SERVER}/api/notes`, {
+      method: 'HEAD',
+      signal: controller.signal,
+      headers: getAuthHeaders(),
+    });
+    clearTimeout(timeout);
+    const online = res.ok || res.status === 401;
+    if (online !== isConnected) {
+      isConnected = online;
+      updateStatusUI(online);
+    }
+  } catch {
+    if (isConnected) {
+      isConnected = false;
+      updateStatusUI(false);
+    }
+  }
+}
+
+function startStatusCheck() {
+  checkConnection();
+  statusCheckTimer = setInterval(checkConnection, 5000);
+}
+
+startStatusCheck();
+
+// 点击便签区域时自动隐藏工具箱
+document.getElementById('noteBody').addEventListener('click', (e) => {
+  if (toolboxPanel && !e.target.closest('.toolbox') && !e.target.closest('.find-replace') && !e.target.closest('.excel-template') && !e.target.closest('.rsa-panel')) {
+    closeToolbox();
+  }
+});
 
 setInterval(async () => {
   if (!currentNote) return;
