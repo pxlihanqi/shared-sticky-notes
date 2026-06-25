@@ -9,6 +9,8 @@ const multer = require('multer');
 const fs = require('fs');
 
 let noteWindows = new Map();
+// 工具箱展开时窗口临时向右加宽的像素数（按 noteId 记录），持久化尺寸时需扣除
+let noteWidthOffsets = new Map();
 let server = null;
 let io = null;
 let onNoteCreatedViaHTTP = null;
@@ -48,8 +50,8 @@ function saveConfig(cfg) {
 }
 
 const config = loadConfig();
-const isServer = !config.serverAddress;
-const serverUrl = isServer ? `http://localhost:${PORT}` : config.serverAddress;
+let isServer = !config.serverAddress;
+let serverUrl = isServer ? `http://localhost:${PORT}` : config.serverAddress;
 
 const adapter = new FileSync(dbPath);
 const db = low(adapter);
@@ -221,13 +223,38 @@ function addNote(data) {
         } catch (e) {}
       });
     });
-    req.on('error', () => {});
+    req.on('error', (err) => {
+      console.error('添加便签失败，可能是远程服务器不可用:', err.message);
+      // 如果当前是客户端模式但远程服务器不可用，提示用户
+      if (!isServer) {
+        dialog.showMessageBox({
+          type: 'error',
+          title: '操作失败',
+          message: '无法连接到远程服务器，请检查网络连接或重启应用以切换到本地模式',
+          buttons: ['确定']
+        });
+      }
+    });
     req.write(postData);
     req.end();
   }
 }
 
 ipcMain.on('note:create', (e, data) => addNote(data));
+
+// 工具箱展开/收起：在原宽度基础上把窗口向右加宽 offset 像素（offset=0 表示收起还原）
+ipcMain.on('note:setWidthOffset', (e, { noteId, offset } = {}) => {
+  const win = noteWindows.get(noteId);
+  if (!win || win.isDestroyed()) return;
+  const next = Math.max(0, Math.round(offset || 0));
+  const prev = noteWidthOffsets.get(noteId) || 0;
+  const [w, h] = win.getSize();
+  // 当前窗口宽度里包含旧 offset，先还原到原始宽度再加上新 offset
+  const baseWidth = w - prev;
+  noteWidthOffsets.set(noteId, next);
+  win.setSize(Math.round(baseWidth + next), h);
+});
+
 
 ipcMain.on('note:close', (e, noteId) => {
   const win = noteWindows.get(noteId);
@@ -332,14 +359,17 @@ function createNoteWindow(note) {
 
   win.on('closed', () => {
     noteWindows.delete(note.id);
+    noteWidthOffsets.delete(note.id);
   });
 
   win.on('move', () => {
     if (win.isDestroyed()) return;
     const [x, y] = win.getPosition();
     const [w, h] = win.getSize();
+    // 扣除工具箱临时加宽的部分，避免把展开宽度存进数据库
+    const offset = noteWidthOffsets.get(note.id) || 0;
     const n = db.get('notes').find({ id: note.id });
-    if (n.value()) n.assign({ x, y, width: w, height: h }).write();
+    if (n.value()) n.assign({ x, y, width: w - offset, height: h }).write();
   });
 }
 
@@ -429,8 +459,38 @@ function openSettings() {
   win.loadURL(`${serverUrl}/settings.html?server=${encodeURIComponent(serverUrl)}`);
 }
 
+async function testRemoteConnection() {
+  return new Promise((resolve) => {
+    const http_ = require('http');
+    const url = new URL(`${serverUrl}/api/notes`);
+    const options = {
+      hostname: url.hostname,
+      port: url.port || 80,
+      path: url.pathname,
+      method: 'GET',
+      timeout: 5000,
+      headers: {},
+    };
+    if (config.clientAuthCode) {
+      options.headers['X-Auth-Code'] = config.clientAuthCode;
+    }
+    const req = http_.get(options, (res) => {
+      resolve(res.statusCode >= 200 && res.statusCode < 300);
+      res.resume();
+    });
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(false);
+    });
+  });
+}
+
 function loadAllNotesFromRemote() {
   const http_ = require('http');
+  let consecutiveFailures = 0;
+  const MAX_FAILURES = 3;
+
   function poll() {
     const url = new URL(`${serverUrl}/api/notes`);
     const options = {
@@ -449,6 +509,7 @@ function loadAllNotesFromRemote() {
       res.on('data', (chunk) => { data += chunk; });
       res.on('end', () => {
         try {
+          consecutiveFailures = 0;
           const notes = JSON.parse(data);
           const remoteIds = new Set(notes.map(n => n.id));
           notes.forEach(note => {
@@ -461,10 +522,43 @@ function loadAllNotesFromRemote() {
               win.close();
             }
           });
-        } catch (e) {}
+        } catch (e) {
+          consecutiveFailures++;
+          handleRemoteFailure();
+        }
       });
-    }).on('error', () => {});
+    }).on('error', () => {
+      consecutiveFailures++;
+      handleRemoteFailure();
+    });
   }
+
+  async function handleRemoteFailure() {
+    if (consecutiveFailures >= MAX_FAILURES && !isServer) {
+      console.log('远程服务器连接失败，切换到本地服务器模式');
+      dialog.showMessageBox({
+        type: 'warning',
+        title: '连接失败',
+        message: '无法连接到远程服务器，已自动切换为本地服务器模式',
+        buttons: ['确定']
+      });
+
+      // 切换到本地服务器模式
+      isServer = true;
+      serverUrl = `http://localhost:${PORT}`;
+      consecutiveFailures = 0;
+
+      // 启动本地服务器
+      try {
+        onNoteCreatedViaHTTP = (note) => createNoteWindow(note);
+        await startLocalServer();
+        loadAllNotes();
+      } catch (err) {
+        console.error('启动本地服务器失败:', err);
+      }
+    }
+  }
+
   poll();
   setInterval(poll, 3000);
 }
@@ -473,6 +567,24 @@ app.whenReady().then(async () => {
   if (isServer) {
     onNoteCreatedViaHTTP = (note) => createNoteWindow(note);
     await startLocalServer();
+  } else {
+    // 客户端模式：测试远程连接
+    const canConnect = await testRemoteConnection();
+    if (!canConnect) {
+      console.log('无法连接到远程服务器，切换到本地服务器模式');
+      dialog.showMessageBox({
+        type: 'warning',
+        title: '连接失败',
+        message: '无法连接到远程服务器，已自动切换为本地服务器模式',
+        buttons: ['确定']
+      });
+
+      // 切换到本地服务器模式
+      isServer = true;
+      serverUrl = `http://localhost:${PORT}`;
+      onNoteCreatedViaHTTP = (note) => createNoteWindow(note);
+      await startLocalServer();
+    }
   }
   createTray();
   if (isServer) {

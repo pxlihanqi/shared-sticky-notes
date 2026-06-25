@@ -65,7 +65,22 @@ function renderNote() {
   const body = document.getElementById('noteBody');
 
   if (currentNote.type === 'text') {
-    body.innerHTML = `<textarea class="note-content" placeholder="输入内容...">${escapeHTML(currentNote.content)}</textarea>`;
+    let textContent = currentNote.content;
+    let imageUrls = [];
+    try {
+      const parsed = JSON.parse(currentNote.content);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && 'text' in parsed) {
+        textContent = parsed.text || '';
+        imageUrls = Array.isArray(parsed.images) ? parsed.images : [];
+      }
+    } catch {}
+    body.innerHTML = `<textarea class="note-content" placeholder="输入内容...">${escapeHTML(textContent)}</textarea>` +
+      (imageUrls.length > 0 ? `<div class="note-images">${imageUrls.map((url, i) => `
+        <div class="note-image-item">
+          <img class="note-image" src="${escapeHTML(fullImageUrl(url))}" alt="图片" data-url="${escapeHTML(url)}">
+          <button class="img-del-btn" data-index="${i}" title="删除这张图片">✕</button>
+        </div>
+      `).join('')}</div>` : '');
     const textarea = body.querySelector('textarea');
     activeTextarea = textarea;
     let saveTimer;
@@ -77,7 +92,7 @@ function renderNote() {
     textarea.addEventListener('keydown', (e) => {
       // Ctrl+A / Cmd+A 全选
       if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
-        e.stopPropagation(); // 阻止事件冒泡，确保只在 textarea 内生效
+        e.stopPropagation();
       }
       // Ctrl+C / Cmd+C 复制
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
@@ -95,6 +110,21 @@ function renderNote() {
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
         e.stopPropagation();
       }
+      // Ctrl+S / Cmd+S 保存到本地
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        saveToLocal(textarea.value);
+      }
+    });
+    // 文本便签中的图片事件
+    body.querySelectorAll('.note-image').forEach(img => {
+      img.addEventListener('click', () => showImagePreview(img.src));
+    });
+    body.querySelectorAll('.img-del-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteImageAt(parseInt(btn.dataset.index, 10));
+      });
     });
   } else if (currentNote.type === 'image') {
     activeTextarea = null;
@@ -187,10 +217,12 @@ function setupOps() {
   document.addEventListener('mouseup', () => {
     if (isResizing) {
       isResizing = false;
+      // 工具箱展开时窗口被临时加宽，存库时需扣除该部分
+      const offset = (toolboxPanel && window.electronAPI) ? TOOLBOX_WIDTH : 0;
       fetch(`${SERVER}/api/notes/${noteId}`, {
         method: 'PUT',
         headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ width: window.outerWidth, height: window.outerHeight }),
+        body: JSON.stringify({ width: window.outerWidth - offset, height: window.outerHeight }),
       });
     }
   });
@@ -276,11 +308,27 @@ function toggleSearchPanel() {
   setTimeout(() => { searchPanel.classList.add('show'); input.focus(); }, 10);
 }
 
-// 上传若干图片文件并追加到当前便签（图片便签则追加，否则转为图片便签）
+// 上传若干图片文件并追加到当前便签
 async function uploadAndAppendImages(files) {
   const list = Array.from(files || []).filter(f => f && f.type && f.type.startsWith('image/'));
   if (list.length === 0) return;
-  const existing = currentNote.type === 'image' ? parseImageList(currentNote.content) : [];
+  let textContent = '';
+  let existingImages = [];
+  if (currentNote.type === 'text') {
+    try {
+      const parsed = JSON.parse(currentNote.content);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && 'text' in parsed) {
+        textContent = parsed.text || '';
+        existingImages = Array.isArray(parsed.images) ? parsed.images : [];
+      } else {
+        textContent = currentNote.content;
+      }
+    } catch {
+      textContent = currentNote.content;
+    }
+  } else if (currentNote.type === 'image') {
+    existingImages = parseImageList(currentNote.content);
+  }
   const uploaded = [];
   for (const file of list) {
     const fd = new FormData(); fd.append('file', file);
@@ -297,14 +345,14 @@ async function uploadAndAppendImages(files) {
     uploaded.push(data.url);
   }
   if (uploaded.length === 0) return;
-  const merged = existing.concat(uploaded);
-  const content = JSON.stringify(merged);
+  const merged = existingImages.concat(uploaded);
+  const content = JSON.stringify({ text: textContent, images: merged });
   await fetch('/api/notes/' + noteId, {
     method: 'PUT',
     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ type: 'image', content }),
+    body: JSON.stringify({ type: 'text', content }),
   });
-  currentNote.type = 'image'; currentNote.content = content; renderNote();
+  currentNote.type = 'text'; currentNote.content = content; renderNote();
 }
 
 function triggerImageUpload() {
@@ -337,27 +385,33 @@ document.addEventListener('paste', (e) => {
   uploadAndAppendImages(imageFiles);
 });
 
-// 删除图片便签里第 index 张图片；删空则把便签转回文本类型
+// 删除便签里第 index 张图片
 async function deleteImageAt(index) {
-  const images = parseImageList(currentNote.content);
-  images.splice(index, 1);
-  if (images.length === 0) {
-    // 没有图片了，转回空文本便签
-    await fetch('/api/notes/' + noteId, {
-      method: 'PUT',
-      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ type: 'text', content: '' }),
-    });
-    currentNote.type = 'text'; currentNote.content = '';
+  let textContent = '';
+  let images = [];
+  if (currentNote.type === 'text') {
+    try {
+      const parsed = JSON.parse(currentNote.content);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && 'text' in parsed) {
+        textContent = parsed.text || '';
+        images = Array.isArray(parsed.images) ? [...parsed.images] : [];
+      } else {
+        images = parseImageList(currentNote.content);
+      }
+    } catch {
+      images = parseImageList(currentNote.content);
+    }
   } else {
-    const content = JSON.stringify(images);
-    await fetch('/api/notes/' + noteId, {
-      method: 'PUT',
-      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ type: 'image', content }),
-    });
-    currentNote.content = content;
+    images = parseImageList(currentNote.content);
   }
+  images.splice(index, 1);
+  const content = JSON.stringify({ text: textContent, images });
+  await fetch('/api/notes/' + noteId, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ type: 'text', content }),
+  });
+  currentNote.type = 'text'; currentNote.content = content;
   renderNote();
 }
 
@@ -558,14 +612,36 @@ if (remindTime) { checkRemind(); updateRemindBtnUI(); }
 
 // 保存便签内容到服务器，并同步本地状态
 async function saveContent(content) {
-  if (currentNote) currentNote.content = content;
+  let finalContent = content;
+  if (currentNote && currentNote.type === 'text') {
+    try {
+      const parsed = JSON.parse(currentNote.content);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && 'text' in parsed) {
+        finalContent = JSON.stringify({ text: content, images: parsed.images || [] });
+      }
+    } catch {}
+  }
+  if (currentNote) currentNote.content = finalContent;
   try {
     await fetch(`${SERVER}/api/notes/${noteId}`, {
       method: 'PUT',
       headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content: finalContent }),
     });
   } catch (e) {}
+}
+
+// 保存便签内容到本地文件
+function saveToLocal(content) {
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `便签_${noteId}_${new Date().toISOString().slice(0,10)}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // ============ 文本百宝箱 ============
@@ -911,7 +987,7 @@ const TOOL_GROUPS = [
     items: [
       { key: 'findReplace', label: '查找替换' },
       { key: 'generateQR', label: '生成二维码' },
-      { key: 'excelTemplate', label: 'Excel模板生' },
+      { key: 'excelTemplate', label: 'Excel模板生成' },
       { key: 'rsaCrypto', label: 'RSA加解密' },
     ],
   },
@@ -977,6 +1053,25 @@ function updateUndoButton() {
   }
 }
 
+// 二维码弹窗显示
+function showQRPopup(dataURL, text) {
+  const existing = document.getElementById('qr-popup');
+  if (existing) existing.remove();
+  const popup = document.createElement('div');
+  popup.id = 'qr-popup';
+  popup.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(22,33,62,0.98);color:#fff;border-radius:12px;padding:16px;z-index:10001;box-shadow:0 4px 24px rgba(0,0,0,0.5);text-align:center;max-width:90vw;';
+  popup.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span style="font-size:12px;font-weight:600;">📱 二维码</span>
+      <button id="qr-popup-close" style="background:rgba(255,255,255,0.12);border:none;color:#fff;width:18px;height:18px;border-radius:50%;cursor:pointer;font-size:10px;">✕</button>
+    </div>
+    <img src="${dataURL}" style="max-width:260px;border-radius:8px;background:#fff;padding:8px;" />
+    <div style="font-size:10px;opacity:0.6;margin-top:6px;word-break:break-all;max-width:260px;">${escapeHTML(text.length > 40 ? text.slice(0, 40) + '...' : text)}</div>
+  `;
+  document.body.appendChild(popup);
+  popup.querySelector('#qr-popup-close').addEventListener('click', () => popup.remove());
+}
+
 // 对当前 textarea 应用工具：有选区则只处理选区，否则处理全文（支持异步函数）
 async function applyTool(fn) {
   const ta = activeTextarea;
@@ -994,21 +1089,7 @@ async function applyTool(fn) {
   // 特殊处理：二维码生成（返回标记 + Data URL）
   if (typeof processed === 'string' && processed.startsWith('__QR_CODE_DATA_URL__')) {
     const dataURL = processed.replace('__QR_CODE_DATA_URL__', '');
-    // 创建新的图片便签
-    const newNote = {
-      type: 'image',
-      content: dataURL,
-      color: '#fff9c4',
-      x: window.screenX + 30,
-      y: window.screenY + 30,
-      width: 320,
-      height: 320,
-    };
-    await fetch(`${SERVER}/api/notes`, {
-      method: 'POST',
-      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(newNote),
-    });
+    showQRPopup(dataURL, value.trim());
     closeToolbox();
     return;
   }
@@ -1052,6 +1133,22 @@ async function applyTool(fn) {
 }
 
 let toolboxPanel = null;
+const TOOLBOX_WIDTH = 340; // 与 CSS .toolbox { width } 保持一致
+
+function expandWindowForToolbox() {
+  if (!window.electronAPI) return;
+  // 锁定便签卡片为当前像素宽度，防止窗口变宽时内容区跟着拉伸
+  const card = document.getElementById('noteCard');
+  card.style.width = card.offsetWidth + 'px';
+  window.electronAPI.setWidthOffset(noteId, TOOLBOX_WIDTH);
+}
+
+function shrinkWindowForToolbox() {
+  if (!window.electronAPI) return;
+  window.electronAPI.setWidthOffset(noteId, 0);
+  const card = document.getElementById('noteCard');
+  card.style.width = '';
+}
 
 function refreshToolboxStats() {
   if (!toolboxPanel || !activeTextarea) return;
@@ -1077,7 +1174,9 @@ function closeToolbox() {
         toolboxPanel.remove();
         toolboxPanel = null;
       }
-    }, 300); // 等动画结束
+      // 等面板滑出动画结束后再收窄窗口，避免面板回弹遮住便签
+      shrinkWindowForToolbox();
+    }, 300);
     document.removeEventListener('keydown', onToolboxEsc);
   }
   closeFindReplacePanel();
@@ -1823,6 +1922,9 @@ function openToolbox() {
   toolboxPanel = panel;
   document.addEventListener('keydown', onToolboxEsc);
 
+  // Electron 窗口向右加宽，让工具箱在便签框外侧展开、不遮住内容
+  expandWindowForToolbox();
+
   // 触发动画
   setTimeout(() => panel.classList.add('show'), 10);
 
@@ -1971,13 +2073,6 @@ function startStatusCheck() {
 
 startStatusCheck();
 
-// 点击便签区域时自动隐藏工具箱
-document.getElementById('noteBody').addEventListener('click', (e) => {
-  if (toolboxPanel && !e.target.closest('.toolbox') && !e.target.closest('.find-replace') && !e.target.closest('.excel-template') && !e.target.closest('.rsa-panel')) {
-    closeToolbox();
-  }
-});
-
 setInterval(async () => {
   if (!currentNote) return;
   try {
@@ -1986,20 +2081,24 @@ setInterval(async () => {
     const notes = await res.json();
     const latest = notes.find(n => n.id === noteId);
     if (!latest) return;
-    // 类型或图片/文件内容变化时整体重渲染（如另一端加/删图片）
-    const typeChanged = latest.type !== currentNote.type;
-    const nonTextContentChanged = latest.type !== 'text' && latest.content !== currentNote.content;
-    if (typeChanged || nonTextContentChanged) {
+    // 内容变化时整体重渲染
+    if (latest.type !== currentNote.type || latest.content !== currentNote.content) {
       currentNote = latest;
       renderNote();
       return;
     }
     const textarea = document.querySelector('.note-content');
-    // 仅当本窗口持有焦点且光标在文本框里才跳过：activeElement 按文档保留，
-    // 切到别的窗口后本 textarea 仍是 activeElement，需叠加 hasFocus()，
-    // 否则该便签窗口会永久卡住、收不到对方的更新。
     if (textarea && document.hasFocus() && document.activeElement === textarea) return;
-    if (textarea && textarea.value !== (latest.content || '')) textarea.value = latest.content || '';
+    if (textarea) {
+      let textVal = latest.content || '';
+      try {
+        const parsed = JSON.parse(latest.content);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && 'text' in parsed) {
+          textVal = parsed.text || '';
+        }
+      } catch {}
+      if (textarea.value !== textVal) textarea.value = textVal;
+    }
     const card = document.getElementById('noteCard');
     if (card && card.style.background !== latest.color) {
       card.style.background = latest.color;

@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   togglePin: (noteId) => ipcRenderer.sendSync('note:togglePin', noteId),
   isPinned: (noteId) => ipcRenderer.sendSync('note:isPinned', noteId),
   focusNote: (noteId) => ipcRenderer.send('note:focus', noteId),
+  setWidthOffset: (noteId, offset) => ipcRenderer.send('note:setWidthOffset', { noteId, offset }),
   getConfig: () => ipcRenderer.invoke('config:get'),
   setConfig: (cfg) => ipcRenderer.invoke('config:set', cfg),
   generateAuthCode: () => ipcRenderer.invoke('config:generateAuthCode'),
