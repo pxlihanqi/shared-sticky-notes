@@ -434,12 +434,10 @@ function createTray() {
     tray.setToolTip('共享便签');
     tray.setContextMenu(contextMenu);
 
-    // Windows 下双击托盘图标显示所有便签，单击弹出菜单
+    // Windows: 左键单击显示所有便签，右键单击弹出菜单
     if (process.platform === 'win32') {
-      tray.on('click', () => {
-        tray.popUpContextMenu();
-      });
-      tray.on('double-click', () => restoreAllNotes());
+      tray.on('click', () => restoreAllNotes());
+      tray.on('right-click', () => tray.popUpContextMenu());
     }
   }
 }

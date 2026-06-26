@@ -84,9 +84,11 @@ function renderNote() {
     const textarea = body.querySelector('textarea');
     activeTextarea = textarea;
     let saveTimer;
+    textareaDirty = false;
     textarea.addEventListener('input', () => {
+      textareaDirty = true;
       clearTimeout(saveTimer);
-      saveTimer = setTimeout(() => saveContent(textarea.value), 500);
+      saveTimer = setTimeout(() => { saveContent(textarea.value); }, 500);
     });
     // 添加快捷键支持
     textarea.addEventListener('keydown', (e) => {
@@ -628,6 +630,7 @@ async function saveContent(content) {
       headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ content: finalContent }),
     });
+    textareaDirty = false; // 保存成功后才重置脏标记
   } catch (e) {}
 }
 
@@ -1133,6 +1136,7 @@ async function applyTool(fn) {
 }
 
 let toolboxPanel = null;
+let textareaDirty = false;
 const TOOLBOX_WIDTH = 340; // 与 CSS .toolbox { width } 保持一致
 
 function expandWindowForToolbox() {
@@ -2081,14 +2085,18 @@ setInterval(async () => {
     const notes = await res.json();
     const latest = notes.find(n => n.id === noteId);
     if (!latest) return;
+
+    const textarea = document.querySelector('.note-content');
+    // 正在编辑时，跳过所有同步逻辑（包括重渲染）
+    if (textarea && document.hasFocus() && document.activeElement === textarea) return;
+    if (textarea && textareaDirty) return;
+
     // 内容变化时整体重渲染
     if (latest.type !== currentNote.type || latest.content !== currentNote.content) {
       currentNote = latest;
       renderNote();
       return;
     }
-    const textarea = document.querySelector('.note-content');
-    if (textarea && document.hasFocus() && document.activeElement === textarea) return;
     if (textarea) {
       let textVal = latest.content || '';
       try {
