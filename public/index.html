@@ -177,22 +177,24 @@
   <div class="header">
     <h1>📌 共享便签</h1>
     <div class="search-box">
-      <span class="search-icon">🔍</span>
+      <span class="search-icon"><i class="ph ph-magnifying-glass"></i></span>
       <input type="text" class="search-input" id="searchInput" placeholder="搜索便签内容...">
-      <button class="search-clear" id="searchClear">✕</button>
+      <button class="search-clear" id="searchClear"><i class="ph ph-x"></i></button>
       <span class="search-count" id="searchCount"></span>
     </div>
-    <button class="toolbox-toggle" id="toolboxToggle" title="工具箱">🔧</button>
+    <button class="toolbox-toggle" id="toolboxToggle" title="工具箱"><i class="ph ph-wrench"></i></button>
   </div>
   <div class="global-toolbox" id="toolbox">
     <div class="global-toolbox-content">
-      <button class="global-toolbox-item" id="uploadBtn">🖼️ 上传图片</button>
-      <button class="global-toolbox-item" id="alarmBtn">⏰ 定时闹钟</button>
+      <button class="global-toolbox-item" id="uploadBtn"><i class="ph ph-image"></i> 上传图片</button>
+      <button class="global-toolbox-item" id="fileTransferBtn"><i class="ph ph-folder"></i> 文件互传</button>
+      <button class="global-toolbox-item" id="alarmBtn"><i class="ph ph-bell"></i> 定时闹钟</button>
     </div>
   </div>
   <div class="status" id="status">● 连接中...</div>
   <div class="board" id="board"></div>
   <button class="add-btn" id="addBtn" title="新建便签">+</button>
+  <link rel="stylesheet" href="phosphor-regular.css">
   <script src="/socket.io/socket.io.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -240,12 +242,12 @@
         <div class="note-header">
           <span class="note-title">${typeLabel}</span>
           <div class="note-actions">
-            <button data-action="toolbox" title="工具箱">🧰</button>
-            <button data-action="color" title="换颜色">🎨</button>
-            <button data-action="more" title="更多">⋯</button>
+            <button data-action="toolbox" title="工具箱"><i class="ph ph-wrench"></i></button>
+            <button data-action="color" title="换颜色"><i class="ph ph-palette"></i></button>
+            <button data-action="more" title="更多"><i class="ph ph-dots-three"></i></button>
             <div class="note-dropdown">
-              <button data-action="upload">🖼️ 上传图片</button>
-              <button data-action="delete">✕ 删除</button>
+              <button data-action="upload"><i class="ph ph-image"></i> 上传图片</button>
+              <button data-action="delete"><i class="ph ph-x"></i> 删除</button>
             </div>
           </div>
         </div>
@@ -288,7 +290,7 @@
       }
       if (note.type === 'file') {
         try {
-          return JSON.parse(note.content).map(f => `<a class="note-file" href="${esc(f.url)}" target="_blank" download="${esc(f.originalName)}">📄 ${esc(f.originalName)} <span style="opacity:0.5;font-size:10px">${formatSize(f.size || 0)}</span></a>`).join('');
+          return JSON.parse(note.content).map(f => `<a class="note-file" href="${esc(f.url)}" target="_blank" download="${esc(f.originalName)}"><i class="ph ph-file-text"></i> ${esc(f.originalName)} <span style="opacity:0.5;font-size:10px">${formatSize(f.size || 0)}</span></a>`).join('');
         } catch { return `<div>${esc(note.content)}</div>`; }
       }
       return `<div>${esc(note.content)}</div>`;
@@ -402,6 +404,105 @@
       uploadInput.value = '';
     });
 
+    // ============ 文件互传 ============
+    const fileTransferBtn = document.getElementById('fileTransferBtn');
+    fileTransferBtn.addEventListener('click', () => {
+      toolbox.classList.remove('show');
+      openFileTransferPanel();
+    });
+
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+      return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+    }
+
+    function openFileTransferPanel() {
+      const existing = document.getElementById('ftPanel');
+      if (existing) { existing.remove(); return; }
+      const panel = document.createElement('div');
+      panel.id = 'ftPanel';
+      panel.className = 'web-toolbox';
+      panel.innerHTML = `
+        <div class="wtb-header">
+          <span class="wtb-title"><i class="ph ph-folder"></i> 文件互传</span>
+          <button class="wtb-close" title="关闭"><i class="ph ph-x"></i></button>
+        </div>
+        <div style="margin-bottom:10px;">
+          <button id="ftUploadBtn" style="width:100%;background:rgba(33,150,243,0.6);border:1px solid rgba(33,150,243,0.8);color:#fff;padding:8px;border-radius:6px;cursor:pointer;font-size:13px;">📂 选择文件上传</button>
+          <div id="ftProgress" style="display:none;font-size:11px;color:#aaa;margin-top:6px;"></div>
+        </div>
+        <div id="ftList" style="overflow-y:auto;max-height:calc(100vh - 140px);"></div>
+      `;
+      const listEl = panel.querySelector('#ftList');
+      const progressEl = panel.querySelector('#ftProgress');
+
+      async function loadFiles() {
+        try {
+          const res = await fetch('/api/files');
+          const files = await res.json();
+          if (files.length === 0) {
+            listEl.innerHTML = '<div style="text-align:center;color:#888;font-size:13px;padding:30px 0;">暂无文件</div>';
+            return;
+          }
+          listEl.innerHTML = files.map(f => {
+            const url = '/uploads/' + encodeURIComponent(f.name);
+            const displayName = f.originalName || f.name;
+            return `
+              <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:rgba(255,255,255,0.06);margin-bottom:4px;">
+                <span style="font-size:22px;flex-shrink:0;"><i class="ph ph-file-text"></i></span>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:13px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${esc(displayName)}">${esc(displayName)}</div>
+                  <div style="font-size:11px;color:#aaa;">${formatFileSize(f.size)}</div>
+                </div>
+                <a href="${esc(url)}" download="${esc(displayName)}" style="background:rgba(76,175,80,0.5);border:none;color:#fff;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;text-decoration:none;flex-shrink:0;">下载</a>
+                <button class="ft-del-btn" data-name="${esc(f.name)}" style="background:rgba(244,67,54,0.5);border:none;color:#fff;padding:4px 8px;border-radius:4px;font-size:11px;cursor:pointer;flex-shrink:0;"><i class="ph ph-x"></i></button>
+              </div>
+            `;
+          }).join('');
+          listEl.querySelectorAll('.ft-del-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+              e.stopPropagation();
+              if (!confirm('确定删除此文件？')) return;
+              await fetch('/api/files/' + encodeURIComponent(btn.dataset.name), { method: 'DELETE' });
+              loadFiles();
+            });
+          });
+        } catch {
+          listEl.innerHTML = '<div style="text-align:center;color:#f44;font-size:13px;padding:30px 0;">加载失败</div>';
+        }
+      }
+
+      panel.querySelector('#ftUploadBtn').addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.multiple = true;
+        input.addEventListener('change', async () => {
+          const files = Array.from(input.files);
+          if (files.length === 0) return;
+          progressEl.style.display = 'block';
+          let done = 0;
+          for (const file of files) {
+            progressEl.textContent = `上传中 (${done + 1}/${files.length}): ${file.name}`;
+            const fd = new FormData();
+            fd.append('file', file);
+            await fetch('/api/upload', { method: 'POST', body: fd });
+            done++;
+          }
+          progressEl.textContent = `上传完成 (${done}/${files.length})`;
+          setTimeout(() => { progressEl.style.display = 'none'; }, 1500);
+          loadFiles();
+        });
+        input.click();
+      });
+
+      panel.querySelector('.wtb-close').addEventListener('click', () => panel.remove());
+      document.body.appendChild(panel);
+      setTimeout(() => panel.classList.add('show'), 10);
+      loadFiles();
+    }
+
     // ============ 定时闹钟 ============
     const alarmBtn = document.getElementById('alarmBtn');
     let alarmTimer = null;
@@ -457,12 +558,11 @@
       panel.className = 'web-toolbox';
       panel.innerHTML = `
         <div class="wtb-header">
-          <span class="wtb-title">🧰 文本工具</span>
-          <div class="wtb-header-actions">
-            <button class="wtb-copy" title="复制全部内容">📋 复制</button>
-            <button class="wtb-clear" title="清空内容">🗑 清空</button>
-            <button class="wtb-undo" title="无可撤回操作" disabled>↩ 撤回</button>
-            <button class="wtb-close" title="关闭">✕</button>
+          <span class="wtb-title"><i class="ph ph-wrench"></i> 文本工具</span>
+            <button class="wtb-copy" title="复制全部内容"><i class="ph ph-copy"></i> 复制</button>
+            <button class="wtb-clear" title="清空内容"><i class="ph ph-trash"></i> 清空</button>
+            <button class="wtb-undo" title="无可撤回操作" disabled><i class="ph ph-arrow-u-up-left"></i> 撤回</button>
+            <button class="wtb-close" title="关闭"><i class="ph ph-x"></i></button>
           </div>
         </div>
         <div class="wtb-stats"></div>
@@ -581,7 +681,7 @@
       const panel = document.createElement('div');
       panel.className = 'find-replace';
       panel.innerHTML = `
-        <div class="fr-header"><span class="fr-title">🔍 查找替换</span><button class="fr-close" title="关闭">✕</button></div>
+        <div class="fr-header"><span class="fr-title"><i class="ph ph-magnifying-glass"></i> 查找替换</span><button class="fr-close" title="关闭"><i class="ph ph-x"></i></button></div>
         <input class="fr-find" type="text" placeholder="查找内容">
         <input class="fr-replace" type="text" placeholder="替换为">
         <div class="fr-opts">
@@ -639,7 +739,7 @@
       const panel = document.createElement('div');
       panel.className = 'rsa-panel';
       panel.innerHTML = `
-        <div class="rsa-header"><span class="rsa-title">🔐 RSA 加解密</span><button class="rsa-close" title="关闭">✕</button></div>
+        <div class="rsa-header"><span class="rsa-title"><i class="ph ph-lock-key"></i> RSA 加解密</span><button class="rsa-close" title="关闭"><i class="ph ph-x"></i></button></div>
         <div class="rsa-info">RSA 2048 位 · NoPadding · 兼容 Java</div>
         <div class="rsa-actions"><button class="rsa-btn rsa-gen">🔑 生成密钥对</button></div>
         <textarea class="rsa-key rsa-pub" placeholder="公钥 (PEM)"></textarea>
@@ -693,8 +793,8 @@
       const panel = document.createElement('div');
       panel.className = 'excel-template';
       panel.innerHTML = `
-        <div class="et-header"><span class="et-title">📊 Excel 模板生成</span><button class="et-close" title="关闭">✕</button></div>
-        <button class="et-upload-btn">📁 上传 Excel 文件</button>
+        <div class="et-header"><span class="et-title"><i class="ph ph-file-xls"></i> Excel 模板生成</span><button class="et-close" title="关闭"><i class="ph ph-x"></i></button></div>
+        <button class="et-upload-btn"><i class="ph ph-folder"></i> 上传 Excel 文件</button>
         <div class="et-info">上传 Excel 文件后，点击列名插入占位符，生成模板文本。</div>
         <div class="et-columns"></div>
         <textarea class="et-template" placeholder="输入模板，如：INSERT INTO table (name) VALUES ('{name}')"></textarea>
@@ -790,12 +890,11 @@
       panel.className = 'web-toolbox';
       panel.innerHTML = `
         <div class="wtb-header">
-          <span class="wtb-title">🧰 文本工具</span>
-          <div class="wtb-header-actions">
-            <button class="wtb-copy" title="复制全部">📋</button>
-            <button class="wtb-clear" title="清空">🗑</button>
-            <button class="wtb-undo" title="撤回" disabled>↩</button>
-            <button class="wtb-close" title="关闭">✕</button>
+          <span class="wtb-title"><i class="ph ph-wrench"></i> 文本工具</span>
+            <button class="wtb-copy" title="复制全部"><i class="ph ph-copy"></i></button>
+            <button class="wtb-clear" title="清空"><i class="ph ph-trash"></i></button>
+            <button class="wtb-undo" title="撤回" disabled><i class="ph ph-arrow-u-up-left"></i></button>
+            <button class="wtb-close" title="关闭"><i class="ph ph-x"></i></button>
           </div>
         </div>
         <div class="wtb-stats"></div>
@@ -818,7 +917,7 @@
       const extraGroup = document.createElement('div'); extraGroup.className = 'wtb-group';
       extraGroup.innerHTML = `<div class="wtb-group-title">高级功能</div>`;
       const extraBtns = document.createElement('div'); extraBtns.className = 'wtb-btns';
-      [{label:'🔍 查找替换', fn: openFindReplace}, {label:'🔐 RSA加解密', fn: openRsaPanel}, {label:'📊 Excel模板', fn: openExcelTemplate}, {label:'📝 Markdown预览', fn: toggleMarkdownPreview}].forEach(item => {
+      [{label:'<i class="ph ph-magnifying-glass"></i> 查找替换', fn: openFindReplace}, {label:'<i class="ph ph-lock-key"></i> RSA加解密', fn: openRsaPanel}, {label:'<i class="ph ph-file-xls"></i> Excel模板', fn: openExcelTemplate}, {label:'<i class="ph ph-note"></i> Markdown预览', fn: toggleMarkdownPreview}].forEach(item => {
         const b = document.createElement('button'); b.className = 'wtb-btn'; b.textContent = item.label;
         b.addEventListener('click', item.fn);
         extraBtns.appendChild(b);

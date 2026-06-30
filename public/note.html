@@ -4,24 +4,27 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>便签</title>
+  <link rel="stylesheet" href="phosphor-regular.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="note-card" id="noteCard">
     <div class="note-ops">
-      <button class="op-btn" id="addBtn" title="新增便签">＋</button>
-      <button class="op-btn" id="colorBtn" title="换颜色">🎨</button>
-      <button class="op-btn" id="toolBtn" title="文本工具箱">🧰</button>
-      <button class="op-btn" id="pinBtn" title="置顶">📌</button>
-      <button class="op-btn" id="moreBtn" title="更多工具">⋯</button>
-      <button class="op-btn" id="maxBtn" title="最大化">⛶</button>
-      <button class="op-btn" id="minBtn" title="最小化">－</button>
-      <button class="op-btn" id="closeBtn" title="删除">✕</button>
+      <button class="op-btn" id="addBtn" title="新增便签"><i class="ph ph-plus"></i></button>
+      <button class="op-btn" id="themeBtn" title="颜色/主题"><i class="ph ph-palette"></i></button>
+      <button class="op-btn" id="toolBtn" title="文本工具箱"><i class="ph ph-wrench"></i></button>
+      <button class="op-btn" id="pinBtn" title="置顶"><i class="ph ph-push-pin"></i></button>
+      <button class="op-btn" id="moreBtn" title="更多工具"><i class="ph ph-dots-three"></i></button>
+      <button class="op-btn" id="maxBtn" title="最大化"><i class="ph ph-arrows-out"></i></button>
+      <button class="op-btn" id="minBtn" title="最小化"><i class="ph ph-minus"></i></button>
+      <button class="op-btn" id="closeBtn" title="删除"><i class="ph ph-x"></i></button>
     </div>
     <div class="toolbox-dropdown" id="toolboxDropdown">
-      <button class="dropdown-item" data-action="search">🔍 搜索便签</button>
-      <button class="dropdown-item" data-action="image">🖼 上传图片</button>
-      <button class="dropdown-item" data-action="remind">⏰ 定时提醒</button>
+      <button class="dropdown-item" data-action="search"><i class="ph ph-magnifying-glass"></i> 搜索便签</button>
+      <button class="dropdown-item" data-action="checklist"><i class="ph ph-clipboard-text"></i> 任务清单</button>
+      <button class="dropdown-item" data-action="image"><i class="ph ph-image"></i> 上传图片</button>
+      <button class="dropdown-item" data-action="file"><i class="ph ph-folder"></i> 文件互传</button>
+      <button class="dropdown-item" data-action="remind"><i class="ph ph-bell"></i> 定时提醒</button>
     </div>
     <div class="note-body" id="noteBody"></div>
     <div class="note-status" id="noteStatus">

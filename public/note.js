@@ -2,6 +2,21 @@ const params = new URLSearchParams(window.location.search);
 const noteId = params.get('id');
 const SERVER = params.get('server') || window.location.origin;
 const COLORS = ['#ffeb3b', '#ffc107', '#ff9800', '#ff7043', '#e91e63', '#f48fb1', '#4caf50', '#8bc34a', '#009688', '#00bcd4', '#2196f3', '#3f51b5', '#9c27b0', '#795548', '#607d8b', '#ffffff'];
+
+// 主题预设
+const THEMES = [
+  { id: 'cyberpink', label: '赛博粉', bg: '#1a0a1e', text: '#ff6ec7', shadow: 'rgba(255,110,199,0.4)', glow: '0 0 15px rgba(255,110,199,0.3)', accent: '#00ffff', font: '' },
+  { id: 'cyberblue', label: '赛博蓝', bg: '#0a0e27', text: '#00d4ff', shadow: 'rgba(0,212,255,0.4)', glow: '0 0 15px rgba(0,212,255,0.3)', accent: '#ff00ff', font: '' },
+  { id: 'solarized', label: 'Solarized', bg: '#002b36', text: '#839496', shadow: 'rgba(0,0,0,0.5)', glow: '', accent: '#b58900', font: '' },
+  { id: 'matrix', label: '矩阵', bg: '#000000', text: '#00ff41', shadow: 'rgba(0,255,65,0.3)', glow: '0 0 12px rgba(0,255,65,0.25)', accent: '#00ff41', font: '' },
+  { id: 'terminal', label: '终端', bg: '#1e1e1e', text: '#4ec9b0', shadow: 'rgba(78,201,176,0.3)', glow: '0 0 10px rgba(78,201,176,0.2)', accent: '#dcdcaa', font: 'Consolas,Monaco,monospace' },
+  { id: 'dracula', label: 'Dracula', bg: '#282a36', text: '#f8f8f2', shadow: 'rgba(0,0,0,0.5)', glow: '', accent: '#bd93f9', font: '' },
+  { id: 'nord', label: 'Nord', bg: '#2e3440', text: '#d8dee9', shadow: 'rgba(0,0,0,0.5)', glow: '', accent: '#88c0d0', font: '' },
+  { id: 'tokyonight', label: 'Tokyo Night', bg: '#1a1b26', text: '#a9b1d6', shadow: 'rgba(0,0,0,0.5)', glow: '', accent: '#7aa2f7', font: '' },
+  { id: 'gruvbox', label: 'Gruvbox', bg: '#282828', text: '#ebdbb2', shadow: 'rgba(0,0,0,0.5)', glow: '', accent: '#d65d0e', font: '' },
+  { id: 'rose', label: 'Rose Pine', bg: '#191724', text: '#e0def4', shadow: 'rgba(0,0,0,0.5)', glow: '', accent: '#eb6f92', font: '' },
+  { id: 'ocean', label: 'Ocean', bg: '#0f2027', text: '#8ec8c8', shadow: 'rgba(0,0,0,0.5)', glow: '', accent: '#38b2ac', font: '' },
+];
 let currentNote = null;
 let activeTextarea = null;
 let authCode = null; // 客户端验证码
@@ -58,10 +73,209 @@ async function loadNote() {
   } catch (e) {}
 }
 
+// 字体大小调整
+const FONT_SIZE_MIN = 9;
+const FONT_SIZE_MAX = 40;
+const FONT_SIZE_DEFAULT = 13;
+
+function changeFontSize(delta) {
+  if (!currentNote) return;
+  const current = currentNote.fontSize || FONT_SIZE_DEFAULT;
+  const next = Math.min(FONT_SIZE_MAX, Math.max(FONT_SIZE_MIN, current + delta));
+  if (next === current) return;
+  currentNote.fontSize = next;
+  const textarea = document.querySelector('.note-content');
+  if (textarea) textarea.style.fontSize = next + 'px';
+  fetch(`${SERVER}/api/notes/${noteId}`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ fontSize: next }),
+  });
+}
+
+function resetFontSize() {
+  if (!currentNote) return;
+  currentNote.fontSize = FONT_SIZE_DEFAULT;
+  const textarea = document.querySelector('.note-content');
+  if (textarea) textarea.style.fontSize = FONT_SIZE_DEFAULT + 'px';
+  fetch(`${SERVER}/api/notes/${noteId}`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ fontSize: FONT_SIZE_DEFAULT }),
+  });
+}
+
+// ============ 任务清单 ============
+
+function genItemId() {
+  return 'item_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+}
+
+function saveChecklist(items) {
+  const content = JSON.stringify(items);
+  currentNote.content = content;
+  fetch(`${SERVER}/api/notes/${noteId}`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ content }),
+  });
+}
+
+function renderChecklist(body, items) {
+  const done = items.filter(i => i.checked).length;
+  const total = items.length;
+  body.innerHTML = `
+    <div class="checklist">
+      <div class="checklist-header">
+        <span class="checklist-progress">${total > 0 ? done + '/' + total : '空清单'}</span>
+      </div>
+      <div class="checklist-items">
+        ${items.map((item, idx) => `
+          <div class="checklist-item${item.checked ? ' checked' : ''}" data-id="${item.id}" data-index="${idx}" draggable="true">
+            <span class="checklist-drag" title="拖动排序">⠿</span>
+            <label class="checklist-checkbox">
+              <input type="checkbox" ${item.checked ? 'checked' : ''}>
+              <span class="checklist-checkmark"></span>
+            </label>
+            <span class="checklist-text">${escapeHTML(item.text)}</span>
+            <button class="checklist-del" title="删除"><i class="ph ph-x"></i></button>
+          </div>
+        `).join('')}
+      </div>
+      <div class="checklist-add">
+        <textarea class="checklist-input" placeholder="添加任务（支持批量，每行一个）" rows="1"></textarea>
+        <button class="checklist-add-btn"><i class="ph ph-plus"></i></button>
+      </div>
+    </div>
+  `;
+
+  // 勾选/取消
+  body.querySelectorAll('.checklist-checkbox input').forEach(cb => {
+    cb.addEventListener('change', (e) => {
+      const itemEl = e.target.closest('.checklist-item');
+      const id = itemEl.dataset.id;
+      const item = items.find(i => i.id === id);
+      if (item) {
+        item.checked = e.target.checked;
+        itemEl.classList.toggle('checked', item.checked);
+        saveChecklist(items);
+        body.querySelector('.checklist-progress').textContent = items.filter(i => i.checked).length + '/' + total;
+      }
+    });
+  });
+
+  // 双击编辑
+  body.querySelectorAll('.checklist-text').forEach(el => {
+    el.addEventListener('dblclick', () => {
+      const itemEl = el.closest('.checklist-item');
+      const id = itemEl.dataset.id;
+      const item = items.find(i => i.id === id);
+      if (!item) return;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'checklist-edit';
+      input.value = item.text;
+      el.replaceWith(input);
+      input.focus();
+      input.select();
+      function commit() {
+        const newText = input.value.trim();
+        if (newText && newText !== item.text) {
+          item.text = newText;
+          saveChecklist(items);
+        }
+        renderChecklist(body, items);
+      }
+      input.addEventListener('blur', commit);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+        if (e.key === 'Escape') { input.value = item.text; input.blur(); }
+      });
+    });
+  });
+
+  // 删除
+  body.querySelectorAll('.checklist-del').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.closest('.checklist-item').dataset.id;
+      const idx = items.findIndex(i => i.id === id);
+      if (idx !== -1) items.splice(idx, 1);
+      saveChecklist(items);
+      renderChecklist(body, items);
+    });
+  });
+
+  // 拖动排序
+  let dragId = null;
+  body.querySelectorAll('.checklist-item').forEach(el => {
+    el.addEventListener('dragstart', (e) => {
+      dragId = el.dataset.id;
+      el.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    el.addEventListener('dragend', () => {
+      el.classList.remove('dragging');
+      body.querySelectorAll('.checklist-item').forEach(i => i.classList.remove('drag-over'));
+      dragId = null;
+    });
+    el.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (el.dataset.id === dragId) return;
+      el.classList.add('drag-over');
+    });
+    el.addEventListener('dragleave', () => {
+      el.classList.remove('drag-over');
+    });
+    el.addEventListener('drop', (e) => {
+      e.preventDefault();
+      el.classList.remove('drag-over');
+      const fromIdx = items.findIndex(i => i.id === dragId);
+      const toIdx = items.findIndex(i => i.id === el.dataset.id);
+      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
+      const [moved] = items.splice(fromIdx, 1);
+      items.splice(toIdx, 0, moved);
+      saveChecklist(items);
+      renderChecklist(body, items);
+    });
+  });
+
+  // 添加新任务
+  const input = body.querySelector('.checklist-input');
+  const addBtn = body.querySelector('.checklist-add-btn');
+  function addItem() {
+    const lines = input.value.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) return;
+    lines.forEach(text => items.push({ id: genItemId(), text, checked: false }));
+    input.value = '';
+    saveChecklist(items);
+    renderChecklist(body, items);
+  }
+  addBtn.addEventListener('click', addItem);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      addItem();
+    }
+  });
+}
+
 function renderNote() {
   const card = document.getElementById('noteCard');
-  card.style.background = currentNote.color;
-  card.style.color = isLight(currentNote.color) ? '#333' : '#fff';
+  const theme = currentNote.theme ? THEMES.find(t => t.id === currentNote.theme) : null;
+  if (theme) {
+    card.style.background = theme.bg;
+    card.style.color = theme.text;
+    card.style.boxShadow = theme.glow || '0 4px 20px rgba(0,0,0,0.35)';
+    card.style.border = `1px solid ${theme.accent}33`;
+    card.dataset.theme = theme.id;
+  } else {
+    card.style.background = currentNote.color;
+    card.style.color = isLight(currentNote.color) ? '#333' : '#fff';
+    card.style.boxShadow = '';
+    card.style.border = '';
+    card.dataset.theme = '';
+  }
   const body = document.getElementById('noteBody');
 
   if (currentNote.type === 'text') {
@@ -74,11 +288,11 @@ function renderNote() {
         imageUrls = Array.isArray(parsed.images) ? parsed.images : [];
       }
     } catch {}
-    body.innerHTML = `<textarea class="note-content" placeholder="输入内容...">${escapeHTML(textContent)}</textarea>` +
+    body.innerHTML = `<textarea class="note-content" placeholder="输入内容..." spellcheck="false">${escapeHTML(textContent)}</textarea>` +
       (imageUrls.length > 0 ? `<div class="note-images">${imageUrls.map((url, i) => `
         <div class="note-image-item">
           <img class="note-image" src="${escapeHTML(fullImageUrl(url))}" alt="图片" data-url="${escapeHTML(url)}">
-          <button class="img-del-btn" data-index="${i}" title="删除这张图片">✕</button>
+          <button class="img-del-btn" data-index="${i}" title="删除这张图片"><i class="ph ph-x"></i></button>
         </div>
       `).join('')}</div>` : '');
     const textarea = body.querySelector('textarea');
@@ -90,6 +304,9 @@ function renderNote() {
       clearTimeout(saveTimer);
       saveTimer = setTimeout(() => { saveContent(textarea.value); }, 500);
     });
+    // 应用已保存的字体大小
+    const savedFontSize = currentNote.fontSize || 13;
+    textarea.style.fontSize = savedFontSize + 'px';
     // 添加快捷键支持
     textarea.addEventListener('keydown', (e) => {
       // Ctrl+A / Cmd+A 全选
@@ -117,6 +334,21 @@ function renderNote() {
         e.preventDefault();
         saveToLocal(textarea.value);
       }
+      // Ctrl++ 放大字体
+      if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        changeFontSize(1);
+      }
+      // Ctrl+- 缩小字体
+      if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+        e.preventDefault();
+        changeFontSize(-1);
+      }
+      // Ctrl+0 重置字体
+      if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+        e.preventDefault();
+        resetFontSize();
+      }
     });
     // 文本便签中的图片事件
     body.querySelectorAll('.note-image').forEach(img => {
@@ -134,7 +366,7 @@ function renderNote() {
     body.innerHTML = `<div class="note-images">${images.map((url, i) => `
       <div class="note-image-item">
         <img class="note-image" src="${escapeHTML(fullImageUrl(url))}" alt="图片" data-url="${escapeHTML(url)}">
-        <button class="img-del-btn" data-index="${i}" title="删除这张图片">✕</button>
+        <button class="img-del-btn" data-index="${i}" title="删除这张图片"><i class="ph ph-x"></i></button>
       </div>
     `).join('')}</div>`;
     // 点击图片预览
@@ -156,10 +388,10 @@ function renderNote() {
         const fileUrl = f.url.startsWith('http') ? f.url : `${SERVER}${f.url}`;
         return `
           <a class="note-file" href="${escapeHTML(fileUrl)}" target="_blank" download="${escapeHTML(f.originalName)}">
-            <span class="note-file-icon">📄</span>
+            <span class="note-file-icon"><i class="ph ph-file-text"></i></span>
             <div class="note-file-info">
               <div class="note-file-name">${escapeHTML(f.originalName)}</div>
-              <div class="note-file-size">${formatSize(f.size)}</div>
+              <div class="note-file-size">${formatFileSize(f.size)}</div>
             </div>
           </a>
         `;
@@ -167,26 +399,60 @@ function renderNote() {
     } catch {
       body.innerHTML = `<div class="note-content">${escapeHTML(currentNote.content)}</div>`;
     }
+  } else if (currentNote.type === 'checklist') {
+    activeTextarea = null;
+    let items = [];
+    try { items = JSON.parse(currentNote.content); } catch {}
+    if (!Array.isArray(items)) items = [];
+    renderChecklist(body, items);
+  }
+}
+
+function createChecklistNote() {
+  const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+  const data = { type: 'checklist', content: '[]', color };
+  if (window.electronAPI) {
+    window.electronAPI.createNote(data);
+  } else {
+    fetch(`${SERVER}/api/notes`, {
+      method: 'POST',
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(data),
+    });
   }
 }
 
 function setupDrag() {
   const card = document.getElementById('noteCard');
-  let isDragging = false, startX, startY, savedWidth, savedHeight;
+  let isDragging = false, didMove = false, startX, startY, savedWidth, savedHeight;
+  const SNAP_THRESHOLD = 15;
+  function snapToEdge() {
+    const x = window.screenX, y = window.screenY;
+    const w = window.outerWidth, h = window.outerHeight;
+    const sw = window.screen.availWidth, sh = window.screen.availHeight;
+    const sx = window.screen.availLeft || 0, sy = window.screen.availTop || 0;
+    let snapX = x, snapY = y;
+    if (x - sx < SNAP_THRESHOLD) snapX = sx;
+    else if (sx + sw - (x + w) < SNAP_THRESHOLD) snapX = sx + sw - w;
+    if (y - sy < SNAP_THRESHOLD) snapY = sy;
+    else if (sy + sh - (y + h) < SNAP_THRESHOLD) snapY = sy + sh - h;
+    if (snapX !== x || snapY !== y) window.moveTo(snapX, snapY);
+  }
   card.addEventListener('mousedown', (e) => {
-    if (e.target.closest('.note-ops') || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT' || e.target.closest('.color-picker') || e.target.closest('.toolbox') || e.target.closest('.resize-handle') || e.target.closest('a')) return;
+    if (e.target.closest('.note-ops') || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT' || e.target.closest('.color-picker') || e.target.closest('.toolbox') || e.target.closest('.resize-handle') || e.target.closest('a') || e.target.closest('.checklist-item')) return;
     isDragging = true;
+    didMove = false;
     startX = e.screenX;
     startY = e.screenY;
-    // 保存当前尺寸，防止 Windows Aero Snap 自动调整大小
     savedWidth = window.outerWidth;
     savedHeight = window.outerHeight;
     e.preventDefault();
   });
   document.addEventListener('mousemove', (e) => {
     if (!isDragging) return;
-    window.moveTo(window.screenX + e.screenX - startX, window.screenY + e.screenY - startY);
-    // 拖动时恢复原始尺寸，抵消 Windows 的自动调整
+    const dx = e.screenX - startX, dy = e.screenY - startY;
+    if (!didMove && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) didMove = true;
+    window.moveTo(window.screenX + dx, window.screenY + dy);
     if (window.outerWidth !== savedWidth || window.outerHeight !== savedHeight) {
       window.resizeTo(savedWidth, savedHeight);
     }
@@ -194,10 +460,13 @@ function setupDrag() {
   });
   document.addEventListener('mouseup', () => {
     if (isDragging) {
-      // 松开后再次确保尺寸正确
-      window.resizeTo(savedWidth, savedHeight);
+      if (didMove) {
+        window.resizeTo(savedWidth, savedHeight);
+        snapToEdge();
+      }
     }
     isDragging = false;
+    didMove = false;
   });
 }
 
@@ -257,8 +526,8 @@ function toggleSearchPanel() {
   searchPanel.className = 'search-panel';
   searchPanel.innerHTML = `
     <div class="sp-header">
-      <span class="sp-title">🔍 搜索便签</span>
-      <button class="sp-close" title="关闭">✕</button>
+      <span class="sp-title"><i class="ph ph-magnifying-glass"></i> 搜索便签</span>
+      <button class="sp-close" title="关闭"><i class="ph ph-x"></i></button>
     </div>
     <input class="sp-input" type="text" placeholder="输入关键词搜索...">
     <div class="sp-results"></div>
@@ -273,14 +542,24 @@ function toggleSearchPanel() {
       const res = await fetch(`${SERVER}/api/notes`, { headers: getAuthHeaders() });
       const notes = await res.json();
       const q = query.toLowerCase();
-      const matched = notes.filter(n => (n.content || '').toLowerCase().includes(q));
+      function getSearchableText(n) {
+        if (n.type === 'text') {
+          try {
+            const parsed = JSON.parse(n.content);
+            if (parsed && typeof parsed === 'object' && 'text' in parsed) return parsed.text || '';
+          } catch {}
+        }
+        return n.content || '';
+      }
+      const matched = notes.filter(n => getSearchableText(n).toLowerCase().includes(q));
       if (matched.length === 0) {
         results.innerHTML = '<div class="sp-empty">未找到匹配的便签</div>';
         return;
       }
       results.innerHTML = matched.map(n => {
-        const typeIcon = { text: '📝', image: '🖼', file: '📄' }[n.type] || '📝';
-        const preview = (n.content || '').replace(new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), m => `<mark>${m}</mark>`).slice(0, 100);
+        const typeIcon = { text: '<i class="ph ph-note"></i>', image: '<i class="ph ph-image"></i>', file: '<i class="ph ph-file-text"></i>' }[n.type] || '<i class="ph ph-note"></i>';
+        const text = getSearchableText(n);
+        const preview = escapeHTML(text).replace(new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), m => `<mark>${m}</mark>`).slice(0, 100);
         return `<div class="sp-item" data-id="${n.id}" style="background:${n.color};color:${isLight(n.color)?'#333':'#fff'}">
           <span class="sp-item-icon">${typeIcon}</span>
           <div class="sp-item-content">${preview}</div>
@@ -308,6 +587,218 @@ function toggleSearchPanel() {
   searchPanel.querySelector('.sp-close').addEventListener('click', toggleSearchPanel);
   document.body.appendChild(searchPanel);
   setTimeout(() => { searchPanel.classList.add('show'); input.focus(); }, 10);
+}
+
+// ============ 文件互传面板 ============
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+}
+
+function openFileTransfer() {
+  const existing = document.getElementById('fileTransferPanel');
+  if (existing) { existing.remove(); return; }
+
+  const panel = document.createElement('div');
+  panel.id = 'fileTransferPanel';
+  panel.className = 'find-replace';
+  panel.style.width = '320px';
+  panel.style.maxHeight = '70vh';
+  panel.innerHTML = `
+    <div class="fr-header">
+      <span class="fr-title"><i class="ph ph-folder"></i> 文件互传</span>
+      <div style="display:flex;gap:4px;">
+        <button class="fr-close ft-refresh-btn" title="刷新"><i class="ph ph-arrows-clockwise"></i></button>
+        <button class="fr-close" title="关闭"><i class="ph ph-x"></i></button>
+      </div>
+    </div>
+    <div class="fr-row" style="margin-bottom:8px;">
+      <button class="ft-upload-btn" style="flex:1;background:rgba(33,150,243,0.6);border:1px solid rgba(33,150,243,0.8);color:#fff;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px;"><i class="ph ph-folder-open"></i> 选择文件上传</button>
+    </div>
+    <div class="ft-progress" style="display:none;margin-bottom:8px;">
+      <div style="font-size:11px;color:#aaa;margin-bottom:4px;" class="ft-progress-text"></div>
+      <div style="height:4px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden;">
+        <div class="ft-progress-bar" style="height:100%;width:0%;background:rgba(33,150,243,0.8);border-radius:2px;transition:width 0.2s;"></div>
+      </div>
+    </div>
+    <div class="ft-list" style="overflow-y:auto;max-height:50vh;"></div>
+  `;
+
+  const listEl = panel.querySelector('.ft-list');
+  const progressEl = panel.querySelector('.ft-progress');
+  const uploadBtn = panel.querySelector('.ft-upload-btn');
+
+  async function loadFiles() {
+    try {
+      const res = await fetch(`${SERVER}/api/files`, { headers: getAuthHeaders() });
+      const files = await res.json();
+      if (files.length === 0) {
+        listEl.innerHTML = '<div style="text-align:center;color:#888;font-size:12px;padding:20px 0;">暂无文件</div>';
+        return;
+      }
+      listEl.innerHTML = files.map(f => {
+        const url = `${SERVER}/uploads/${encodeURIComponent(f.name)}`;
+        const displayName = f.originalName || f.name;
+        return `
+          <div class="ft-item" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;background:rgba(255,255,255,0.06);margin-bottom:4px;cursor:pointer;" title="${escapeHTML(displayName)}">
+            <span style="font-size:20px;flex-shrink:0;"><i class="ph ph-file-text"></i></span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:12px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(displayName)}</div>
+              <div style="font-size:10px;color:#aaa;">${formatFileSize(f.size)}</div>
+            </div>
+            <button class="ft-download-btn" data-url="${escapeHTML(url)}" data-name="${escapeHTML(displayName)}" style="background:rgba(76,175,80,0.5);border:none;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;cursor:pointer;flex-shrink:0;">下载</button>
+            <button class="ft-del-btn" data-name="${escapeHTML(f.name)}" style="background:rgba(244,67,54,0.5);border:none;color:#fff;padding:3px 6px;border-radius:4px;font-size:10px;cursor:pointer;flex-shrink:0;"><i class="ph ph-x"></i></button>
+          </div>
+        `;
+      }).join('');
+      listEl.querySelectorAll('.ft-download-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const original = btn.textContent;
+          btn.textContent = '...';
+          btn.disabled = true;
+          try {
+            const res = await fetch(btn.dataset.url, { headers: getAuthHeaders() });
+            const blob = await res.blob();
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = btn.dataset.name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+            btn.textContent = '✓';
+            showToast(`✅ ${btn.dataset.name} 下载成功`, 'ok');
+            setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1500);
+          } catch {
+            btn.textContent = '失败';
+            showToast('❌ 下载失败', 'err');
+            setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1500);
+          }
+        });
+      });
+      listEl.querySelectorAll('.ft-del-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if (!confirm('确定删除此文件？')) return;
+          await fetch(`${SERVER}/api/files/${encodeURIComponent(btn.dataset.name)}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+          });
+          loadFiles();
+        });
+      });
+    } catch {
+      listEl.innerHTML = '<div style="text-align:center;color:#f44;font-size:12px;padding:20px 0;">加载失败</div>';
+    }
+  }
+
+  const progressWrap = panel.querySelector('.ft-progress');
+  const progressText = panel.querySelector('.ft-progress-text');
+  const progressBar = panel.querySelector('.ft-progress-bar');
+
+  function showToast(msg, type) {
+    const toast = document.createElement('div');
+    toast.style.cssText = `position:fixed;top:12px;right:12px;padding:8px 14px;border-radius:6px;font-size:12px;z-index:99999;box-shadow:0 2px 12px rgba(0,0,0,0.4);color:#fff;background:${type === 'ok' ? 'rgba(76,175,80,0.9)' : 'rgba(244,67,54,0.9)'};transition:opacity 0.3s;`;
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 2000);
+  }
+
+  function uploadFiles(fileList) {
+    return new Promise((resolve) => {
+      const files = Array.from(fileList);
+      if (files.length === 0) { resolve(); return; }
+      let done = 0, totalSize = 0, loaded = 0;
+      files.forEach(f => totalSize += f.size);
+      progressWrap.style.display = 'block';
+      progressBar.style.width = '0%';
+      progressText.textContent = `准备上传 ${files.length} 个文件...`;
+
+      function uploadNext() {
+        if (done >= files.length) {
+          progressText.textContent = `上传完成 (${done}/${files.length})`;
+          progressBar.style.width = '100%';
+          progressBar.style.background = 'rgba(76,175,80,0.8)';
+          showToast(`✅ ${done} 个文件上传成功`, 'ok');
+          setTimeout(() => { progressWrap.style.display = 'none'; progressBar.style.background = ''; }, 1500);
+          loadFiles();
+          resolve();
+          return;
+        }
+        const file = files[done];
+        const fd = new FormData();
+        fd.append('file', file);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${SERVER}/api/upload`);
+        if (authCode) xhr.setRequestHeader('X-Auth-Code', authCode);
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const filePercent = Math.round(e.loaded / e.total * 100);
+            const overallPercent = Math.round((loaded + e.loaded) / totalSize * 100);
+            progressBar.style.width = overallPercent + '%';
+            progressText.textContent = `上传中 (${done + 1}/${files.length}): ${file.name} ${filePercent}%`;
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status === 401) {
+            progressWrap.style.display = 'none';
+            showToast('❌ 验证码错误或缺失', 'err');
+            resolve();
+            return;
+          }
+          loaded += file.size;
+          done++;
+          uploadNext();
+        };
+        xhr.onerror = () => {
+          progressWrap.style.display = 'none';
+          showToast('❌ 上传失败', 'err');
+          resolve();
+        };
+        xhr.send(fd);
+      }
+      uploadNext();
+    });
+  }
+
+  uploadBtn.addEventListener('click', () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.addEventListener('change', () => uploadFiles(input.files));
+    input.click();
+  });
+
+  panel.querySelector('.ft-refresh-btn').addEventListener('click', loadFiles);
+  panel.querySelector('.fr-close:not(.ft-refresh-btn)').addEventListener('click', () => panel.remove());
+  document.body.appendChild(panel);
+  setTimeout(() => panel.classList.add('show'), 10);
+
+  // 拖拽上传
+  panel.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    panel.style.outline = '2px dashed rgba(33,150,243,0.8)';
+    panel.style.outlineOffset = '-4px';
+  });
+  panel.addEventListener('dragleave', (e) => {
+    if (!panel.contains(e.relatedTarget)) {
+      panel.style.outline = '';
+      panel.style.outlineOffset = '';
+    }
+  });
+  panel.addEventListener('drop', (e) => {
+    e.preventDefault();
+    panel.style.outline = '';
+    panel.style.outlineOffset = '';
+    if (e.dataTransfer.files.length > 0) {
+      uploadFiles(e.dataTransfer.files);
+    }
+  });
+  loadFiles();
 }
 
 // 上传若干图片文件并追加到当前便签
@@ -417,26 +908,83 @@ async function deleteImageAt(index) {
   renderNote();
 }
 
-document.getElementById('colorBtn').addEventListener('click', () => {
+// ============ 颜色/主题选择器（合并） ============
+
+document.getElementById('themeBtn').addEventListener('click', () => {
   const card = document.getElementById('noteCard');
-  const existing = card.querySelector('.color-picker');
+  const existing = card.querySelector('.theme-picker');
   if (existing) { existing.remove(); return; }
+
   const picker = document.createElement('div');
-  picker.className = 'color-picker';
+  picker.className = 'theme-picker';
+
+  // 颜色标题
+  const colorLabel = document.createElement('div');
+  colorLabel.className = 'theme-section-label';
+  colorLabel.textContent = '颜色';
+  picker.appendChild(colorLabel);
+
+  // 颜色圆点行
+  const colorRow = document.createElement('div');
+  colorRow.className = 'theme-color-row';
+  const isDefaultTheme = !currentNote.theme;
   COLORS.forEach(c => {
     const dot = document.createElement('div');
-    dot.className = 'color-dot' + (c === currentNote.color ? ' active' : '');
+    dot.className = 'color-dot' + (isDefaultTheme && c === currentNote.color ? ' active' : '');
     dot.style.background = c;
     dot.addEventListener('click', async () => {
-      card.style.background = c; card.style.color = isLight(c) ? '#333' : '#fff';
-      await fetch('/api/notes/' + noteId, {
+      delete currentNote.theme;
+      currentNote.color = c;
+      await fetch(`${SERVER}/api/notes/${noteId}`, {
         method: 'PUT',
         headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ color: c }),
+        body: JSON.stringify({ color: c, theme: null }),
       });
+      renderNote();
       picker.remove();
     });
-    picker.appendChild(dot);
+    colorRow.appendChild(dot);
+  });
+  picker.appendChild(colorRow);
+
+  // 主题标题
+  const themeLabel = document.createElement('div');
+  themeLabel.className = 'theme-section-label';
+  themeLabel.textContent = '主题';
+  themeLabel.style.marginTop = '6px';
+  picker.appendChild(themeLabel);
+
+  // 默认主题选项
+  const defaultItem = document.createElement('div');
+  defaultItem.className = 'theme-item' + (!currentNote.theme ? ' active' : '');
+  defaultItem.innerHTML = '<div class="theme-preview" style="background:#ffeb3b;"><span style="color:#333;font-size:8px;">Aa</span></div><span class="theme-name">默认</span>';
+  defaultItem.addEventListener('click', async () => {
+    delete currentNote.theme;
+    await fetch(`${SERVER}/api/notes/${noteId}`, {
+      method: 'PUT',
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ theme: null }),
+    });
+    renderNote();
+    picker.remove();
+  });
+  picker.appendChild(defaultItem);
+
+  THEMES.forEach(t => {
+    const item = document.createElement('div');
+    item.className = 'theme-item' + (currentNote.theme === t.id ? ' active' : '');
+    item.innerHTML = `<div class="theme-preview" style="background:${t.bg};border:1px solid ${t.accent}55;"><span style="color:${t.text};font-size:8px;">Aa</span></div><span class="theme-name">${t.label}</span>`;
+    item.addEventListener('click', async () => {
+      currentNote.theme = t.id;
+      await fetch(`${SERVER}/api/notes/${noteId}`, {
+        method: 'PUT',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ theme: t.id }),
+      });
+      renderNote();
+      picker.remove();
+    });
+    picker.appendChild(item);
   });
   card.appendChild(picker);
   setTimeout(() => {
@@ -504,8 +1052,8 @@ function showRemindPanel() {
 
   panel.innerHTML = `
     <div class="remind-header">
-      <span class="remind-title">⏰ 定时提醒</span>
-      <button class="remind-close" title="关闭">✕</button>
+      <span class="remind-title"><i class="ph ph-bell"></i> 定时提醒</span>
+      <button class="remind-close" title="关闭"><i class="ph ph-x"></i></button>
     </div>
     <div class="remind-body">
       <label class="remind-label">提醒时间</label>
@@ -593,11 +1141,17 @@ function checkRemind() {
 }
 
 function showRemindNotification(message) {
+  // 通知触发时：置顶窗口 + 弹窗抖动，5秒后恢复
+  if (window.electronAPI && window.electronAPI.setAlwaysOnTop) {
+    window.electronAPI.setAlwaysOnTop(noteId, true);
+    setTimeout(() => { window.electronAPI.setAlwaysOnTop(noteId, false); }, 5000);
+  }
+
   const overlay = document.createElement('div');
   overlay.className = 'remind-notify';
   overlay.innerHTML = `
-    <div class="remind-notify-box">
-      <div class="remind-notify-icon">⏰</div>
+    <div class="remind-notify-box remind-shake">
+      <div class="remind-notify-icon"><i class="ph ph-bell-ringing"></i></div>
       <div class="remind-notify-title">定时提醒</div>
       <div class="remind-notify-msg">${escapeHTML(message)}</div>
       <button class="remind-notify-ok">知道了</button>
@@ -1007,7 +1561,7 @@ function textStats(t) {
   const chars = t.length;
   const charsNoSpace = t.replace(/\s/g, '').length;
   const lines = t === '' ? 0 : t.split('\n').length;
-  const words = (t.match(/[一-鿿]|[a-zA-Z]+/g) || []).length;
+  const words = charsNoSpace;
   const chinese = (t.match(/[一-鿿]/g) || []).length;
   const punctuation = (t.match(/[，。！？、；：""''【】《》（）…—·\.\,\!\?\;\:\"\'\(\)\[\]\{\}\-\/\\@#\$%\^&\*\+\=\~\`<>]/g) || []).length;
   const spaces = (t.match(/ /g) || []).length;
@@ -1066,7 +1620,7 @@ function showQRPopup(dataURL, text) {
   popup.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
       <span style="font-size:12px;font-weight:600;">📱 二维码</span>
-      <button id="qr-popup-close" style="background:rgba(255,255,255,0.12);border:none;color:#fff;width:18px;height:18px;border-radius:50%;cursor:pointer;font-size:10px;">✕</button>
+      <button id="qr-popup-close" style="background:rgba(255,255,255,0.12);border:none;color:#fff;width:18px;height:18px;border-radius:50%;cursor:pointer;font-size:10px;"><i class="ph ph-x"></i></button>
     </div>
     <img src="${dataURL}" style="max-width:260px;border-radius:8px;background:#fff;padding:8px;" />
     <div style="font-size:10px;opacity:0.6;margin-top:6px;word-break:break-all;max-width:260px;">${escapeHTML(text.length > 40 ? text.slice(0, 40) + '...' : text)}</div>
@@ -1302,8 +1856,8 @@ function toggleExcelTemplatePanel() {
   panel.className = 'excel-template';
   panel.innerHTML = `
     <div class="et-header">
-      <span class="et-title">📊 Excel模板生成</span>
-      <button class="et-close" title="关闭">✕</button>
+      <span class="et-title"><i class="ph ph-file-xls"></i> Excel模板生成</span>
+      <button class="et-close" title="关闭"><i class="ph ph-x"></i></button>
     </div>
     <button class="et-upload-btn">📂 选择 Excel 文件</button>
     <div class="et-info">未选择文件</div>
@@ -1632,8 +2186,8 @@ function toggleRsaPanel() {
   panel.className = 'rsa-panel';
   panel.innerHTML = `
     <div class="rsa-header">
-      <span class="rsa-title">🔐 RSA 加解密</span>
-      <button class="rsa-close" title="关闭">✕</button>
+      <span class="rsa-title"><i class="ph ph-lock-key"></i> RSA 加解密</span>
+      <button class="rsa-close" title="关闭"><i class="ph ph-x"></i></button>
     </div>
     <div class="rsa-info">RSA 2048 位 · NoPadding 原始加密 · 完全兼容 Java</div>
     <div class="rsa-actions">
@@ -1822,8 +2376,8 @@ function toggleFindReplacePanel() {
   panel.className = 'find-replace';
   panel.innerHTML = `
     <div class="fr-header">
-      <span class="fr-title">🔍 查找替换</span>
-      <button class="fr-close" title="关闭">✕</button>
+      <span class="fr-title"><i class="ph ph-magnifying-glass"></i> 查找替换</span>
+      <button class="fr-close" title="关闭"><i class="ph ph-x"></i></button>
     </div>
     <input class="fr-find" type="text" placeholder="查找内容">
     <input class="fr-replace" type="text" placeholder="替换为">
@@ -1857,12 +2411,12 @@ function openToolbox() {
   panel.className = 'toolbox';
   panel.innerHTML = `
     <div class="tb-header">
-      <span class="tb-title">🧰 文本工具</span>
+      <span class="tb-title"><i class="ph ph-wrench"></i> 文本工具</span>
       <div class="tb-header-actions">
-        <button class="tb-copy" title="复制全部内容">📋 复制</button>
-        <button class="tb-clear" title="清空内容">🗑 清空</button>
-        <button class="tb-undo" title="无可撤回操作" disabled>↩ 撤回</button>
-        <button class="tb-close" title="关闭">✕</button>
+        <button class="tb-copy" title="复制全部内容"><i class="ph ph-copy"></i> 复制</button>
+        <button class="tb-clear" title="清空内容"><i class="ph ph-trash"></i> 清空</button>
+        <button class="tb-undo" title="无可撤回操作" disabled><i class="ph ph-arrow-u-up-left"></i> 撤回</button>
+        <button class="tb-close" title="关闭"><i class="ph ph-x"></i></button>
       </div>
     </div>
     <div class="tb-stats"></div>
@@ -1964,7 +2518,9 @@ if (moreBtn && toolboxDropdown) {
     item.addEventListener('click', () => {
       const action = item.dataset.action;
       if (action === 'search') toggleSearchPanel();
+      else if (action === 'checklist') createChecklistNote();
       else if (action === 'image') triggerImageUpload();
+      else if (action === 'file') openFileTransfer();
       else if (action === 'remind') showRemindPanel();
       toolboxDropdown.classList.remove('show');
     });
@@ -2020,11 +2576,6 @@ function escapeHTML(str) {
   const d = document.createElement('div'); d.textContent = str || ''; return d.innerHTML;
 }
 
-function formatSize(bytes) {
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-}
 
 loadNote();
 setupDrag();
@@ -2061,26 +2612,27 @@ async function checkConnection() {
     if (online !== isConnected) {
       isConnected = online;
       updateStatusUI(online);
+      if (online) syncFromServer();
+      restartStatusCheck();
     }
   } catch {
     if (isConnected) {
       isConnected = false;
       updateStatusUI(false);
+      restartStatusCheck();
     }
   }
 }
 
-function startStatusCheck() {
-  checkConnection();
-  statusCheckTimer = setInterval(checkConnection, 5000);
+function restartStatusCheck() {
+  clearInterval(statusCheckTimer);
+  statusCheckTimer = setInterval(checkConnection, isConnected ? 5000 : 2000);
 }
-
-startStatusCheck();
 
 setInterval(async () => {
   if (!currentNote) return;
   try {
-    const res = await fetch('/api/notes', { headers: getAuthHeaders() });
+    const res = await fetch(`${SERVER}/api/notes`, { headers: getAuthHeaders() });
     if (!res.ok) return;
     const notes = await res.json();
     const latest = notes.find(n => n.id === noteId);
@@ -2092,7 +2644,7 @@ setInterval(async () => {
     if (textarea && textareaDirty) return;
 
     // 内容变化时整体重渲染
-    if (latest.type !== currentNote.type || latest.content !== currentNote.content) {
+    if (latest.type !== currentNote.type || latest.content !== currentNote.content || latest.theme !== currentNote.theme) {
       currentNote = latest;
       renderNote();
       return;
@@ -2108,9 +2660,23 @@ setInterval(async () => {
       if (textarea.value !== textVal) textarea.value = textVal;
     }
     const card = document.getElementById('noteCard');
-    if (card && card.style.background !== latest.color) {
-      card.style.background = latest.color;
-      card.style.color = isLight(latest.color) ? '#333' : '#fff';
+    const theme = latest.theme ? THEMES.find(t => t.id === latest.theme) : null;
+    if (theme) {
+      if (card && card.style.background !== theme.bg) {
+        card.style.background = theme.bg;
+        card.style.color = theme.text;
+        card.style.boxShadow = theme.glow || '0 4px 20px rgba(0,0,0,0.35)';
+        card.style.border = `1px solid ${theme.accent}33`;
+        card.dataset.theme = theme.id;
+      }
+    } else {
+      if (card && card.style.background !== latest.color) {
+        card.style.background = latest.color;
+        card.style.color = isLight(latest.color) ? '#333' : '#fff';
+        card.style.boxShadow = '';
+        card.style.border = '';
+        card.dataset.theme = '';
+      }
     }
     currentNote = latest;
   } catch (e) {}

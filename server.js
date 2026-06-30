@@ -38,11 +38,24 @@ function genId() {
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadsDir),
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
+    let originalName = file.originalname;
+    try {
+      const buf = Buffer.from(originalName, 'latin1');
+      const decoded = buf.toString('utf8');
+      if (decoded !== originalName) originalName = decoded;
+    } catch {}
+    const ext = path.extname(originalName);
     cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
   }
 });
-const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
+const upload = multer({ storage, limits: { fileSize: 500 * 1024 * 1024 } });
+
+function loadFileMap() {
+  try { return JSON.parse(fs.readFileSync(path.join(uploadsDir, 'filemap.json'), 'utf-8')); } catch { return {}; }
+}
+function saveFileMap(map) {
+  fs.writeFileSync(path.join(uploadsDir, 'filemap.json'), JSON.stringify(map, null, 2));
+}
 
 // 验证码中间件
 function authMiddleware(req, res, next) {
@@ -78,14 +91,17 @@ app.post('/api/notes', (req, res) => {
 app.put('/api/notes/:id', (req, res) => {
   const note = db.get('notes').find({ id: req.params.id });
   if (!note.value()) return res.status(404).json({ error: 'Not found' });
-  const { content, color, x, y, width, height } = req.body;
+  const { type, content, color, x, y, width, height, fontSize, theme } = req.body;
   const patch = { updated_at: new Date().toISOString() };
+  if (type !== undefined) patch.type = type;
   if (content !== undefined) patch.content = content;
   if (color !== undefined) patch.color = color;
   if (x !== undefined) patch.x = x;
   if (y !== undefined) patch.y = y;
   if (width !== undefined) patch.width = width;
   if (height !== undefined) patch.height = height;
+  if (fontSize !== undefined) patch.fontSize = fontSize;
+  if (theme !== undefined) patch.theme = theme;
   note.assign(patch).write();
   const updated = db.get('notes').find({ id: req.params.id }).value();
   io.emit('note:updated', updated);
@@ -100,7 +116,44 @@ app.delete('/api/notes/:id', (req, res) => {
 
 app.post('/api/upload', upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file' });
-  res.json({ url: `/uploads/${req.file.filename}`, originalName: req.file.originalname, size: req.file.size, type: req.file.mimetype });
+  let originalName = req.file.originalname;
+  try {
+    const buf = Buffer.from(originalName, 'latin1');
+    const decoded = buf.toString('utf8');
+    if (decoded !== originalName) originalName = decoded;
+  } catch {}
+  const map = loadFileMap();
+  map[req.file.filename] = originalName;
+  saveFileMap(map);
+  res.json({ url: `/uploads/${req.file.filename}`, originalName, size: req.file.size, type: req.file.mimetype });
+});
+
+app.get('/api/files', (req, res) => {
+  try {
+    const map = loadFileMap();
+    const files = fs.readdirSync(uploadsDir)
+      .filter(name => name !== 'filemap.json')
+      .map(name => {
+        const stat = fs.statSync(path.join(uploadsDir, name));
+        return { name, originalName: map[name] || name, size: stat.size, mtime: stat.mtimeMs };
+      }).sort((a, b) => b.mtime - a.mtime);
+    res.json(files);
+  } catch { res.json([]); }
+});
+
+app.delete('/api/files/:name', (req, res) => {
+  const safeName = path.basename(req.params.name);
+  if (safeName === 'filemap.json') return res.status(403).json({ error: '禁止删除' });
+  const filePath = path.join(uploadsDir, safeName);
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+    const map = loadFileMap();
+    delete map[safeName];
+    saveFileMap(map);
+    res.json({ ok: true });
+  } else {
+    res.status(404).json({ error: '文件不存在' });
+  }
 });
 
 io.on('connection', (socket) => {
