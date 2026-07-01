@@ -86,6 +86,7 @@ function changeFontSize(delta) {
   currentNote.fontSize = next;
   const textarea = document.querySelector('.note-content');
   if (textarea) textarea.style.fontSize = next + 'px';
+  whSyncFont();
   fetch(`${SERVER}/api/notes/${noteId}`, {
     method: 'PUT',
     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
@@ -98,6 +99,7 @@ function resetFontSize() {
   currentNote.fontSize = FONT_SIZE_DEFAULT;
   const textarea = document.querySelector('.note-content');
   if (textarea) textarea.style.fontSize = FONT_SIZE_DEFAULT + 'px';
+  whSyncFont();
   fetch(`${SERVER}/api/notes/${noteId}`, {
     method: 'PUT',
     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
@@ -307,6 +309,8 @@ function renderNote() {
     // 应用已保存的字体大小
     const savedFontSize = currentNote.fontSize || 13;
     textarea.style.fontSize = savedFontSize + 'px';
+    // 装配「选中词高亮」层
+    setupWordHighlight(textarea);
     // 添加快捷键支持
     textarea.addEventListener('keydown', (e) => {
       // Ctrl+A / Cmd+A 全选
@@ -2560,6 +2564,205 @@ function updateMdToolBtn() {
   const btn = toolboxPanel.querySelector('.tb-btn-md');
   if (btn) btn.classList.toggle('md-active', markdownPreviewActive);
 }
+
+// ============ 选中词高亮 + 计数 + 跳转 ============
+// textarea 无法内嵌高亮标记，采用「镜像背板」方案：在文本框背后放一层与其
+// 完全同步的 div，把匹配到的词用 <mark> 包裹，滚动时同步位移。
+let whTextarea = null, whBackdrop = null, whHighlights = null, whBar = null;
+let whMatches = [], whTerm = '', whActive = -1, whJumping = false;
+
+// 复制文本框的排版样式，保证背板换行/字号与文本框完全一致
+function whCopyStyle() {
+  if (!whTextarea || !whHighlights) return;
+  const cs = getComputedStyle(whTextarea);
+  ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing',
+    'textTransform', 'textIndent', 'wordSpacing', 'padding'].forEach(p => {
+    whHighlights.style[p] = cs[p];
+  });
+  whHighlights.style.whiteSpace = 'pre-wrap';
+  whHighlights.style.wordWrap = 'break-word';
+  whHighlights.style.overflowWrap = 'break-word';
+  whHighlights.style.boxSizing = 'border-box';
+}
+
+// 背板随文本框滚动同步位移
+function whSyncScroll() {
+  if (!whHighlights || !whTextarea) return;
+  whHighlights.style.transform = `translateY(${-whTextarea.scrollTop}px)`;
+}
+
+// 重新渲染高亮标记
+function whRenderMarks() {
+  if (!whHighlights || !whTextarea) return;
+  whHighlights.style.width = whTextarea.clientWidth + 'px';
+  const text = whTextarea.value;
+  let html = '';
+  let last = 0;
+  whMatches.forEach((m, i) => {
+    html += escapeHTML(text.slice(last, m.start));
+    const cls = i === whActive ? 'wh-mark wh-active' : 'wh-mark';
+    html += `<mark class="${cls}">` + escapeHTML(text.slice(m.start, m.end)) + '</mark>';
+    last = m.end;
+  });
+  html += escapeHTML(text.slice(last));
+  whHighlights.innerHTML = html;
+  whSyncScroll();
+}
+
+function whUpdateBar() {
+  if (!whBar) return;
+  whBar.querySelector('.wh-count').textContent = `${whActive + 1}/${whMatches.length}`;
+  whBar.classList.add('show');
+}
+
+function whClear() {
+  whMatches = []; whTerm = ''; whActive = -1;
+  whJumping = false;
+  if (whHighlights) whHighlights.innerHTML = '';
+  if (whBar) whBar.classList.remove('show');
+}
+
+// 用户主动关闭（X 按钮 / Esc）：清除高亮并折叠选区，
+// 避免关闭时残留的选区触发 select 事件把弹窗重新打开
+function whDismiss() {
+  whClear();
+  if (whTextarea) {
+    const pos = whTextarea.selectionEnd;
+    // 折叠选区会触发一次 select，置位消费标记以跳过，避免重新搜索。
+    // 必须在 whClear 之后置位，因为 whClear 会把该标记重置为 false
+    whJumping = true;
+    whTextarea.setSelectionRange(pos, pos);
+  }
+}
+
+// 根据当前选区搜索所有相同的词并高亮
+function whSearch() {
+  if (!whTextarea) return;
+  const s = whTextarea.selectionStart, e = whTextarea.selectionEnd;
+  const term = whTextarea.value.slice(s, e);
+  if (!term || !term.trim()) { whClear(); return; }
+  const text = whTextarea.value;
+  const matches = [];
+  let i = 0;
+  while (i <= text.length) {
+    const idx = text.indexOf(term, i);
+    if (idx === -1) break;
+    matches.push({ start: idx, end: idx + term.length });
+    i = idx + term.length;
+  }
+  if (matches.length === 0) { whClear(); return; }
+  whTerm = term;
+  whMatches = matches;
+  whActive = matches.findIndex(m => m.start === s);
+  if (whActive === -1) whActive = 0;
+  whRenderMarks();
+  whUpdateBar();
+}
+
+// 让当前激活的匹配项滚动进可视区
+function whScrollActiveIntoView() {
+  if (!whHighlights || !whTextarea) return;
+  const mark = whHighlights.querySelector('mark.wh-active');
+  if (!mark) return;
+  const top = mark.offsetTop;
+  const bottom = top + mark.offsetHeight;
+  const viewTop = whTextarea.scrollTop;
+  const viewBottom = viewTop + whTextarea.clientHeight;
+  if (top < viewTop) whTextarea.scrollTop = Math.max(0, top - 8);
+  else if (bottom > viewBottom) whTextarea.scrollTop = bottom - whTextarea.clientHeight + 8;
+  whSyncScroll();
+}
+
+// 跳转到上/下一个匹配项（step 为 +1 或 -1，循环）
+function whJump(step) {
+  if (whMatches.length < 2) return;
+  whActive = (whActive + step + whMatches.length) % whMatches.length;
+  const m = whMatches[whActive];
+  // setSelectionRange 触发的 select 事件是异步的，置位「消费一次」标记，
+  // 让随后到达的 select 事件跳过 whSearch，避免关闭后又被重新打开
+  whJumping = true;
+  whTextarea.focus();
+  whTextarea.setSelectionRange(m.start, m.end);
+  whRenderMarks();
+  whScrollActiveIntoView();
+  whUpdateBar();
+}
+
+function whKeydown(e) {
+  if (e.key === 'F3') {
+    e.preventDefault();
+    whJump(e.shiftKey ? -1 : 1);
+  } else if ((e.ctrlKey || e.metaKey) && (e.key === 'g' || e.key === 'G')) {
+    e.preventDefault();
+    whJump(e.shiftKey ? -1 : 1);
+  } else if (e.key === 'Escape' && whMatches.length) {
+    whDismiss();
+    e.stopPropagation();
+  }
+}
+
+function whSyncFont() {
+  if (!whHighlights) return;
+  whCopyStyle();
+  if (whMatches.length) whRenderMarks();
+}
+
+// 为文本便签的 textarea 装配高亮层与计数条
+function setupWordHighlight(textarea) {
+  whMatches = []; whTerm = ''; whActive = -1; whJumping = false;
+  const card = document.getElementById('noteCard');
+  const oldBar = card.querySelector('.word-hl-bar');
+  if (oldBar) oldBar.remove();
+
+  const container = document.createElement('div');
+  container.className = 'hl-container';
+  const backdrop = document.createElement('div');
+  backdrop.className = 'hl-backdrop';
+  const highlights = document.createElement('div');
+  highlights.className = 'hl-highlights';
+  backdrop.appendChild(highlights);
+  textarea.parentNode.insertBefore(container, textarea);
+  container.appendChild(backdrop);
+  container.appendChild(textarea);
+
+  whTextarea = textarea;
+  whBackdrop = backdrop;
+  whHighlights = highlights;
+  whCopyStyle();
+
+  const bar = document.createElement('div');
+  bar.className = 'word-hl-bar';
+  bar.innerHTML = `
+    <button class="wh-prev" title="上一个 (Shift+F3)"><i class="ph ph-caret-up"></i></button>
+    <span class="wh-count">0/0</span>
+    <button class="wh-next" title="下一个 (F3)"><i class="ph ph-caret-down"></i></button>
+    <span class="wh-sep"></span>
+    <button class="wh-close" title="清除 (Esc)"><i class="ph ph-x"></i></button>
+  `;
+  // preventDefault 让点击工具条时焦点不离开 textarea，
+  // 使 X 按钮的关闭路径与可用的 Esc 路径完全一致（否则点击会先 blur，
+  // 折叠选区失效且焦点切换又重新触发搜索，弹窗关不掉）
+  bar.addEventListener('mousedown', (e) => { e.stopPropagation(); e.preventDefault(); });
+  bar.querySelector('.wh-prev').addEventListener('click', () => whJump(-1));
+  bar.querySelector('.wh-next').addEventListener('click', () => whJump(1));
+  bar.querySelector('.wh-close').addEventListener('click', () => whDismiss());
+  card.appendChild(bar);
+  whBar = bar;
+
+  textarea.addEventListener('select', () => {
+    // whJump 触发的 select 事件在此消费标记并跳过搜索
+    if (whJumping) { whJumping = false; return; }
+    whSearch();
+  });
+  textarea.addEventListener('scroll', whSyncScroll);
+  textarea.addEventListener('input', whClear);
+  textarea.addEventListener('keydown', whKeydown);
+}
+
+// 窗口尺寸变化时重排高亮层
+window.addEventListener('resize', () => {
+  if (whHighlights && whMatches.length) { whCopyStyle(); whRenderMarks(); }
+});
 
 function showImagePreview(src) {
   const overlay = document.createElement('div');
