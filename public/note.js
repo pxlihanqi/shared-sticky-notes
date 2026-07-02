@@ -593,6 +593,18 @@ function toggleSearchPanel() {
   setTimeout(() => { searchPanel.classList.add('show'); input.focus(); }, 10);
 }
 
+// ============ Monaco 编辑器（新窗口） ============
+
+function openMonacoEditor() {
+  if (!currentNote || currentNote.type !== 'text') {
+    alert('仅文本便签支持 Monaco 编辑器');
+    return;
+  }
+  const editorUrl = `monaco-editor.html?id=${encodeURIComponent(noteId)}&server=${encodeURIComponent(SERVER)}` +
+    (authCode ? `&auth=${encodeURIComponent(authCode)}` : '');
+  window.open(editorUrl, '_blank', 'width=960,height=700,noopener=yes');
+}
+
 // ============ 文件互传面板 ============
 
 function formatFileSize(bytes) {
@@ -2526,6 +2538,7 @@ if (moreBtn && toolboxDropdown) {
       else if (action === 'image') triggerImageUpload();
       else if (action === 'file') openFileTransfer();
       else if (action === 'remind') showRemindPanel();
+      else if (action === 'monaco') openMonacoEditor();
       toolboxDropdown.classList.remove('show');
     });
   });
