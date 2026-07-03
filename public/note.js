@@ -262,6 +262,51 @@ function renderChecklist(body, items) {
   });
 }
 
+// ============ 右键菜单 ============
+let ctxMenuEl = null;
+
+function showContextMenu(x, y, ta) {
+  hideContextMenu();
+  const menu = document.createElement('div');
+  menu.className = 'ctx-menu';
+  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  const mod = isMac ? '⌘' : 'Ctrl';
+  const hasSel = ta && ta.selectionStart !== ta.selectionEnd;
+  const items = [
+    { icon: 'ph scissors', label: '剪切', shortcut: mod + '+X', action: () => { if (ta) { document.execCommand('cut'); } } },
+    { icon: 'ph copy', label: '复制', shortcut: mod + '+C', action: () => { if (ta) { document.execCommand('copy'); } } },
+    { icon: 'ph clipboard', label: '粘贴', shortcut: mod + '+V', action: async () => { if (ta) { try { const text = await navigator.clipboard.readText(); const s = ta.selectionStart, e = ta.selectionEnd; ta.value = ta.value.slice(0, s) + text + ta.value.slice(e); ta.selectionStart = ta.selectionEnd = s + text.length; ta.dispatchEvent(new Event('input')); } catch {} } } },
+    'sep',
+    { icon: 'ph select', label: '全选', shortcut: mod + '+A', action: () => { if (ta) { ta.select(); } } },
+  ];
+  items.forEach(item => {
+    if (item === 'sep') {
+      const sep = document.createElement('div');
+      sep.className = 'ctx-menu-sep';
+      menu.appendChild(sep);
+      return;
+    }
+    const btn = document.createElement('button');
+    btn.className = 'ctx-menu-item';
+    btn.innerHTML = `<i class="ph ${item.icon}"></i>${item.label}<span class="shortcut">${item.shortcut}</span>`;
+    btn.addEventListener('click', (e) => { e.stopPropagation(); item.action(); hideContextMenu(); });
+    menu.appendChild(btn);
+  });
+  document.body.appendChild(menu);
+  // 防止溢出屏幕
+  const rect = menu.getBoundingClientRect();
+  if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 8;
+  if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 8;
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+  ctxMenuEl = menu;
+  setTimeout(() => document.addEventListener('click', hideContextMenu, { once: true }), 0);
+}
+
+function hideContextMenu() {
+  if (ctxMenuEl) { ctxMenuEl.remove(); ctxMenuEl = null; }
+}
+
 function renderNote() {
   const card = document.getElementById('noteCard');
   const theme = currentNote.theme ? THEMES.find(t => t.id === currentNote.theme) : null;
@@ -369,6 +414,11 @@ function renderNote() {
         e.stopPropagation();
         deleteImageAt(parseInt(btn.dataset.index, 10));
       });
+    });
+    // 右键菜单
+    textarea.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      showContextMenu(e.clientX, e.clientY, textarea);
     });
   } else if (currentNote.type === 'image') {
     activeTextarea = null;
