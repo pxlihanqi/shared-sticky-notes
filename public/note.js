@@ -278,6 +278,7 @@ function renderNote() {
     card.style.border = '';
     card.dataset.theme = '';
   }
+  card.style.opacity = String(currentNote.opacity ?? 1);
   const body = document.getElementById('noteBody');
 
   if (currentNote.type === 'text') {
@@ -352,6 +353,11 @@ function renderNote() {
       if ((e.ctrlKey || e.metaKey) && e.key === '0') {
         e.preventDefault();
         resetFontSize();
+      }
+      // Ctrl+F / Cmd+F 查找替换
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        toggleFindReplacePanel();
       }
     });
     // 文本便签中的图片事件
@@ -1002,6 +1008,42 @@ document.getElementById('themeBtn').addEventListener('click', () => {
     });
     picker.appendChild(item);
   });
+
+  // 透明度滑块
+  const opacityLabel = document.createElement('div');
+  opacityLabel.className = 'theme-section-label';
+  opacityLabel.textContent = '透明度';
+  opacityLabel.style.marginTop = '4px';
+  picker.appendChild(opacityLabel);
+  const opacityRow = document.createElement('div');
+  opacityRow.className = 'theme-opacity';
+  const opacitySlider = document.createElement('input');
+  opacitySlider.type = 'range';
+  opacitySlider.min = '0.1';
+  opacitySlider.max = '1';
+  opacitySlider.step = '0.05';
+  opacitySlider.value = String(currentNote.opacity ?? 1);
+  const opacityValue = document.createElement('span');
+  opacityValue.className = 'theme-opacity-value';
+  opacityValue.textContent = Math.round((currentNote.opacity ?? 1) * 100) + '%';
+  opacitySlider.addEventListener('input', () => {
+    const val = parseFloat(opacitySlider.value);
+    opacityValue.textContent = Math.round(val * 100) + '%';
+    card.style.opacity = String(val);
+  });
+  opacitySlider.addEventListener('change', async () => {
+    const val = parseFloat(opacitySlider.value);
+    currentNote.opacity = val;
+    await fetch(`${SERVER}/api/notes/${noteId}`, {
+      method: 'PUT',
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ opacity: val }),
+    });
+  });
+  opacityRow.appendChild(opacitySlider);
+  opacityRow.appendChild(opacityValue);
+  picker.appendChild(opacityRow);
+
   card.appendChild(picker);
   setTimeout(() => {
     const close = (ev) => { if (!picker.contains(ev.target)) { picker.remove(); document.removeEventListener('click', close); } };
@@ -1568,6 +1610,12 @@ const TOOL_GROUPS = [
     title: '预览',
     items: [
       { key: 'markdownPreview', label: 'Markdown预览' },
+    ],
+  },
+  {
+    title: '校验码',
+    items: [
+      { key: 'totp', label: '谷歌校验码', action: 'panel' },
     ],
   },
 ];
@@ -2452,7 +2500,10 @@ function openToolbox() {
       const b = document.createElement('button');
       b.className = 'tb-btn';
       b.textContent = item.label;
-      b.addEventListener('click', () => applyTool(TEXT_TOOLS[item.key]));
+      b.addEventListener('click', () => {
+        if (item.action === 'panel') { openTotpPanel(); return; }
+        applyTool(TEXT_TOOLS[item.key]);
+      });
       btns.appendChild(b);
     });
     g.appendChild(btns);
@@ -2576,6 +2627,150 @@ function updateMdToolBtn() {
   if (!toolboxPanel) return;
   const btn = toolboxPanel.querySelector('.tb-btn-md');
   if (btn) btn.classList.toggle('md-active', markdownPreviewActive);
+}
+
+// ============ 谷歌校验码 (TOTP) ============
+let totpPanel = null;
+let totpTimer = null;
+const TOTP_STORAGE_KEY = 'stickyNotesTotpAccounts';
+
+function totpBase32Decode(encoded) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  encoded = encoded.replace(/[\s=]/g, '').toUpperCase();
+  let bits = '';
+  for (const c of encoded) {
+    const val = alphabet.indexOf(c);
+    if (val === -1) continue;
+    bits += val.toString(2).padStart(5, '0');
+  }
+  const bytes = new Uint8Array(Math.floor(bits.length / 8));
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(bits.slice(i * 8, i * 8 + 8), 2);
+  }
+  return bytes;
+}
+
+async function totpGenerateCode(secret, period = 30, digits = 6) {
+  const keyBytes = totpBase32Decode(secret);
+  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
+  const time = Math.floor(Date.now() / 1000 / period);
+  const timeBytes = new ArrayBuffer(8);
+  const view = new DataView(timeBytes);
+  view.setUint32(4, time, false);
+  const hmac = new Uint8Array(await crypto.subtle.sign('HMAC', key, timeBytes));
+  const offset = hmac[hmac.length - 1] & 0x0f;
+  const code = ((hmac[offset] & 0x7f) << 24 | (hmac[offset + 1] & 0xff) << 16 | (hmac[offset + 2] & 0xff) << 8 | (hmac[offset + 3] & 0xff)) % Math.pow(10, digits);
+  return String(code).padStart(digits, '0');
+}
+
+function totpLoadAccounts() {
+  try { return JSON.parse(localStorage.getItem(TOTP_STORAGE_KEY) || '[]'); } catch { return []; }
+}
+
+function totpSaveAccounts(accounts) {
+  localStorage.setItem(TOTP_STORAGE_KEY, JSON.stringify(accounts));
+}
+
+function openTotpPanel() {
+  if (totpPanel) { closeTotpPanel(); return; }
+  if (totpTimer) { clearInterval(totpTimer); totpTimer = null; }
+  const panel = document.createElement('div');
+  panel.className = 'totp-panel';
+  panel.innerHTML = `
+    <div class="totp-header">
+      <span class="totp-title"><i class="ph ph-shield-check"></i> 谷歌校验码</span>
+      <button class="totp-close" title="关闭"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="totp-add-section">
+      <input class="totp-input totp-name-input" type="text" placeholder="账户名称（如: GitHub）">
+      <input class="totp-input totp-secret-input" type="text" placeholder="密钥（Base32，如: JBSWY3DPEHPK3PXP）">
+      <button class="totp-add-btn">添加账户</button>
+    </div>
+    <div class="totp-list"></div>
+  `;
+  panel.querySelector('.totp-close').addEventListener('click', closeTotpPanel);
+  panel.querySelector('.totp-add-btn').addEventListener('click', () => {
+    const nameInput = panel.querySelector('.totp-name-input');
+    const secretInput = panel.querySelector('.totp-secret-input');
+    const name = nameInput.value.trim();
+    const secret = secretInput.value.replace(/\s/g, '').trim();
+    if (!name || !secret) { alert('请输入账户名称和密钥'); return; }
+    if (!/^[A-Z2-7]+=*$/i.test(secret)) { alert('密钥格式错误，仅支持 Base32 字符'); return; }
+    const accounts = totpLoadAccounts();
+    accounts.push({ id: Date.now(), name, secret: secret.toUpperCase() });
+    totpSaveAccounts(accounts);
+    nameInput.value = '';
+    secretInput.value = '';
+    renderTotpList(panel);
+  });
+  document.body.appendChild(panel);
+  setTimeout(() => panel.classList.add('show'), 10);
+  totpPanel = panel;
+  renderTotpList(panel);
+}
+
+function closeTotpPanel() {
+  if (totpTimer) { clearInterval(totpTimer); totpTimer = null; }
+  if (totpPanel) { totpPanel.classList.remove('show'); setTimeout(() => { if (totpPanel) { totpPanel.remove(); totpPanel = null; } }, 300); }
+}
+
+async function renderTotpList(panel) {
+  const listEl = panel.querySelector('.totp-list');
+  const accounts = totpLoadAccounts();
+  if (!accounts.length) {
+    listEl.innerHTML = '<div class="totp-empty">暂无账户，请添加</div>';
+    return;
+  }
+  listEl.innerHTML = '';
+  for (const acct of accounts) {
+    const item = document.createElement('div');
+    item.className = 'totp-item';
+    item.innerHTML = `
+      <div class="totp-item-header">
+        <span class="totp-item-name">${escapeHTML(acct.name)}</span>
+        <button class="totp-item-del" data-id="${acct.id}" title="删除"><i class="ph ph-x"></i></button>
+      </div>
+      <div class="totp-code">------</div>
+      <div class="totp-progress"><div class="totp-progress-bar" style="width:100%"></div></div>
+      <div class="totp-item-meta"></div>
+    `;
+    item.querySelector('.totp-item-del').addEventListener('click', () => {
+      const accts = totpLoadAccounts().filter(a => a.id !== acct.id);
+      totpSaveAccounts(accts);
+      renderTotpList(panel);
+    });
+    item.querySelector('.totp-code').addEventListener('click', async (e) => {
+      const code = await totpGenerateCode(acct.secret);
+      navigator.clipboard.writeText(code).catch(() => {});
+      const el = e.target;
+      el.classList.add('copied');
+      el.textContent = code;
+      setTimeout(() => el.classList.remove('copied'), 1000);
+    });
+    listEl.appendChild(item);
+  }
+  updateTotpCodes();
+  if (totpTimer) clearInterval(totpTimer);
+  totpTimer = setInterval(updateTotpCodes, 1000);
+}
+
+async function updateTotpCodes() {
+  if (!totpPanel) return;
+  const accounts = totpLoadAccounts();
+  const items = totpPanel.querySelectorAll('.totp-item');
+  const period = 30;
+  const now = Math.floor(Date.now() / 1000);
+  const remaining = period - (now % period);
+  for (let i = 0; i < items.length && i < accounts.length; i++) {
+    const code = await totpGenerateCode(accounts[i].secret);
+    const codeEl = items[i].querySelector('.totp-code');
+    if (!codeEl.classList.contains('copied')) codeEl.textContent = code.slice(0, 3) + ' ' + code.slice(3);
+    const bar = items[i].querySelector('.totp-progress-bar');
+    bar.style.width = (remaining / period * 100) + '%';
+    bar.style.background = remaining <= 5 ? '#f44336' : '#4caf50';
+    const meta = items[i].querySelector('.totp-item-meta');
+    meta.textContent = `${remaining}s 后刷新`;
+  }
 }
 
 // ============ 选中词高亮 + 计数 + 跳转 ============

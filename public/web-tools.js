@@ -272,6 +272,9 @@ const TOOL_GROUPS = [
   { title: '实用工具', items: [
     { key: 'generateQR', label: '生成二维码' },
   ]},
+  { title: '校验码', items: [
+    { key: 'totp', label: '谷歌校验码', action: 'panel' },
+  ]},
 ];
 
 // ============ 文本统计 ============

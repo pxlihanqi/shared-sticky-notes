@@ -32,7 +32,9 @@
     .add-btn { position: fixed; bottom: 24px; right: 24px; width: 56px; height: 56px; border-radius: 50%; background: #4caf50; color: #fff; border: none; font-size: 28px; cursor: pointer; box-shadow: 0 4px 20px rgba(76,175,80,0.4); transition: all 0.2s; }
     .add-btn:hover { transform: scale(1.1); background: #66bb6a; }
     .resize-handle { position: absolute; bottom: 0; right: 0; width: 14px; height: 14px; cursor: nwse-resize; }
-    .color-picker { position: absolute; bottom: -36px; left: 0; display: flex; gap: 4px; background: rgba(22,33,62,0.95); padding: 4px 8px; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.5); z-index: 100; }
+    .color-picker { position: absolute; bottom: -72px; left: 0; display: flex; gap: 4px; background: rgba(22,33,62,0.95); padding: 4px 8px; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.5); z-index: 100; flex-wrap: wrap; width: fit-content; }
+    .color-picker input[type="range"] { flex: 1; height: 4px; -webkit-appearance: none; appearance: none; background: rgba(255,255,255,0.2); border-radius: 2px; outline: none; }
+    .color-picker input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #4caf50; cursor: pointer; }
     .color-dot { width: 16px; height: 16px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
     .color-dot:hover { transform: scale(1.2); }
     .color-dot.active { border-color: #fff; }
@@ -106,7 +108,7 @@
     .markdown-preview th { background: rgba(0,0,0,0.1); font-weight: 600; }
 
     /* 查找替换面板 */
-    .find-replace { position: fixed; top: 0; right: 0; width: 340px; height: 100vh; overflow-y: auto; background: rgba(22,33,62,0.98); color: #fff; padding: 12px 14px 20px; box-shadow: -4px 0 24px rgba(0,0,0,0.3); z-index: 10001; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); }
+    .find-replace { position: fixed; top: 0; right: 0; width: 340px; height: auto; max-height: 280px; overflow-y: auto; background: rgba(22,33,62,0.98); color: #fff; padding: 12px 14px 20px; box-shadow: -4px 0 24px rgba(0,0,0,0.3); z-index: 10001; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); }
     .find-replace.show { transform: translateX(0); }
     .fr-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
     .fr-title { font-size: 12px; font-weight: 600; opacity: 0.9; }
@@ -171,6 +173,35 @@
     /* 图片预览遮罩 */
     .image-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.88); display: flex; align-items: center; justify-content: center; z-index: 99999; cursor: pointer; }
     .image-overlay img { max-width: 90vw; max-height: 90vh; border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+
+    /* TOTP 面板 */
+    .totp-panel { position: fixed; top: 0; right: 0; width: 340px; height: 100vh; overflow-y: auto; background: rgba(22,33,62,0.98); color: #fff; padding: 12px 14px 20px; box-shadow: -4px 0 24px rgba(0,0,0,0.3); z-index: 10001; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); }
+    .totp-panel.show { transform: translateX(0); }
+    .totp-panel::-webkit-scrollbar { width: 4px; }
+    .totp-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+    .totp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .totp-title { font-size: 12px; font-weight: 600; opacity: 0.9; }
+    .totp-close { background: rgba(255,255,255,0.12); border: none; color: #fff; width: 18px; height: 18px; border-radius: 50%; cursor: pointer; font-size: 10px; }
+    .totp-close:hover { background: rgba(255,255,255,0.25); }
+    .totp-add-section { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .totp-input { width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 8px; border-radius: 6px; font-size: 11px; margin-bottom: 6px; outline: none; font-family: 'Courier New', monospace; }
+    .totp-input:focus { border-color: rgba(76,175,80,0.75); }
+    .totp-input::placeholder { color: rgba(255,255,255,0.4); font-family: -apple-system, sans-serif; }
+    .totp-add-btn { width: 100%; background: rgba(76,175,80,0.6); border: none; color: #fff; padding: 7px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: background 0.15s; }
+    .totp-add-btn:hover { background: rgba(76,175,80,0.85); }
+    .totp-list { display: flex; flex-direction: column; gap: 8px; }
+    .totp-item { background: rgba(255,255,255,0.06); border-radius: 8px; padding: 10px; position: relative; }
+    .totp-item-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .totp-item-name { font-size: 12px; font-weight: 600; opacity: 0.9; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .totp-item-del { background: rgba(244,67,54,0.5); border: none; color: #fff; width: 18px; height: 18px; border-radius: 50%; cursor: pointer; font-size: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .totp-item-del:hover { background: rgba(244,67,54,0.8); }
+    .totp-code { font-size: 28px; font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: 4px; text-align: center; margin: 4px 0; cursor: pointer; user-select: all; }
+    .totp-code:hover { opacity: 0.8; }
+    .totp-code.copied { color: #4caf50; }
+    .totp-progress { height: 3px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; margin-top: 4px; }
+    .totp-progress-bar { height: 100%; background: #4caf50; border-radius: 2px; transition: width 1s linear; }
+    .totp-item-meta { font-size: 10px; opacity: 0.5; text-align: center; margin-top: 2px; }
+    .totp-empty { text-align: center; color: rgba(255,255,255,0.3); font-size: 12px; padding: 20px 0; }
   </style>
 </head>
 <body>
@@ -236,6 +267,7 @@
       el.style.height = (note.height || 200) + 'px';
       el.style.background = note.color;
       el.style.color = isLight(note.color) ? '#333' : '#fff';
+      el.style.opacity = String(note.opacity ?? 1);
 
       const typeLabel = {text:'文字',image:'图片',file:'文件'}[note.type] || '文字';
       el.innerHTML = `
@@ -364,6 +396,8 @@
           if (picker) { picker.remove(); return; }
           picker = document.createElement('div');
           picker.className = 'color-picker';
+          picker.style.flexDirection = 'column';
+          picker.style.gap = '4px';
           COLORS.forEach(c => {
             const d = document.createElement('div');
             d.className = 'color-dot' + (c === note.color ? ' active' : '');
@@ -371,6 +405,23 @@
             d.onclick = async () => { el.style.background = c; el.style.color = isLight(c)?'#333':'#fff'; note.color = c; await fetch('/api/notes/'+note.id, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({color:c})}); picker.remove(); };
             picker.appendChild(d);
           });
+          // 透明度滑块
+          const opRow = document.createElement('div');
+          opRow.style.cssText = 'display:flex;align-items:center;gap:6px;width:100%;';
+          const opLabel = document.createElement('span');
+          opLabel.style.cssText = 'font-size:10px;color:rgba(255,255,255,0.5);white-space:nowrap;';
+          opLabel.textContent = '透明度';
+          const opSlider = document.createElement('input');
+          opSlider.type = 'range'; opSlider.min = '0.1'; opSlider.max = '1'; opSlider.step = '0.05';
+          opSlider.value = String(note.opacity ?? 1);
+          opSlider.style.cssText = 'flex:1;height:4px;-webkit-appearance:none;appearance:none;background:rgba(255,255,255,0.2);border-radius:2px;outline:none;';
+          const opVal = document.createElement('span');
+          opVal.style.cssText = 'font-size:10px;color:rgba(255,255,255,0.7);min-width:28px;text-align:right;';
+          opVal.textContent = Math.round((note.opacity ?? 1) * 100) + '%';
+          opSlider.addEventListener('input', () => { el.style.opacity = opSlider.value; opVal.textContent = Math.round(parseFloat(opSlider.value) * 100) + '%'; });
+          opSlider.addEventListener('change', () => { const v = parseFloat(opSlider.value); note.opacity = v; fetch('/api/notes/'+note.id, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({opacity:v})}); });
+          opRow.appendChild(opLabel); opRow.appendChild(opSlider); opRow.appendChild(opVal);
+          picker.appendChild(opRow);
           el.appendChild(picker);
           setTimeout(() => { const close = ev => { if (!picker.contains(ev.target)) { picker.remove(); document.removeEventListener('click',close); } }; document.addEventListener('click',close); }, 0);
         }
@@ -520,6 +571,151 @@
       toolbox.classList.remove('show');
     });
 
+    // ============ 谷歌校验码 (TOTP) ============
+    const totpBtn = document.getElementById('totpBtn');
+    let totpPanel = null;
+    let totpTimer = null;
+    const TOTP_STORAGE_KEY = 'stickyNotesTotpAccounts';
+
+    function totpBase32Decode(encoded) {
+      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+      encoded = encoded.replace(/[\s=]/g, '').toUpperCase();
+      let bits = '';
+      for (const c of encoded) {
+        const val = alphabet.indexOf(c);
+        if (val === -1) continue;
+        bits += val.toString(2).padStart(5, '0');
+      }
+      const bytes = new Uint8Array(Math.floor(bits.length / 8));
+      for (let i = 0; i < bytes.length; i++) {
+        bytes[i] = parseInt(bits.slice(i * 8, i * 8 + 8), 2);
+      }
+      return bytes;
+    }
+
+    async function totpGenerateCode(secret, period = 30, digits = 6) {
+      const keyBytes = totpBase32Decode(secret);
+      const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
+      const time = Math.floor(Date.now() / 1000 / period);
+      const timeBytes = new ArrayBuffer(8);
+      const view = new DataView(timeBytes);
+      view.setUint32(4, time, false);
+      const hmac = new Uint8Array(await crypto.subtle.sign('HMAC', key, timeBytes));
+      const offset = hmac[hmac.length - 1] & 0x0f;
+      const code = ((hmac[offset] & 0x7f) << 24 | (hmac[offset + 1] & 0xff) << 16 | (hmac[offset + 2] & 0xff) << 8 | (hmac[offset + 3] & 0xff)) % Math.pow(10, digits);
+      return String(code).padStart(digits, '0');
+    }
+
+    function totpLoadAccounts() {
+      try { return JSON.parse(localStorage.getItem(TOTP_STORAGE_KEY) || '[]'); } catch { return []; }
+    }
+
+    function totpSaveAccounts(accounts) {
+      localStorage.setItem(TOTP_STORAGE_KEY, JSON.stringify(accounts));
+    }
+
+    function openTotpPanel() {
+      if (totpPanel) { closeTotpPanel(); return; }
+      if (totpTimer) { clearInterval(totpTimer); totpTimer = null; }
+      const panel = document.createElement('div');
+      panel.className = 'totp-panel';
+      panel.innerHTML = `
+        <div class="totp-header">
+          <span class="totp-title"><i class="ph ph-shield-check"></i> 谷歌校验码</span>
+          <button class="totp-close" title="关闭"><i class="ph ph-x"></i></button>
+        </div>
+        <div class="totp-add-section">
+          <input class="totp-input totp-name-input" type="text" placeholder="账户名称（如: GitHub）">
+          <input class="totp-input totp-secret-input" type="text" placeholder="密钥（Base32，如: JBSWY3DPEHPK3PXP）">
+          <button class="totp-add-btn">添加账户</button>
+        </div>
+        <div class="totp-list"></div>
+      `;
+      panel.querySelector('.totp-close').addEventListener('click', closeTotpPanel);
+      panel.querySelector('.totp-add-btn').addEventListener('click', () => {
+        const nameInput = panel.querySelector('.totp-name-input');
+        const secretInput = panel.querySelector('.totp-secret-input');
+        const name = nameInput.value.trim();
+        const secret = secretInput.value.replace(/\s/g, '').trim();
+        if (!name || !secret) { alert('请输入账户名称和密钥'); return; }
+        if (!/^[A-Z2-7]+=*$/i.test(secret)) { alert('密钥格式错误，仅支持 Base32 字符'); return; }
+        const accounts = totpLoadAccounts();
+        accounts.push({ id: Date.now(), name, secret: secret.toUpperCase() });
+        totpSaveAccounts(accounts);
+        nameInput.value = '';
+        secretInput.value = '';
+        renderTotpList(panel);
+      });
+      document.body.appendChild(panel);
+      setTimeout(() => panel.classList.add('show'), 10);
+      totpPanel = panel;
+      renderTotpList(panel);
+    }
+
+    function closeTotpPanel() {
+      if (totpTimer) { clearInterval(totpTimer); totpTimer = null; }
+      if (totpPanel) { totpPanel.classList.remove('show'); setTimeout(() => { if (totpPanel) { totpPanel.remove(); totpPanel = null; } }, 300); }
+    }
+
+    async function renderTotpList(panel) {
+      const listEl = panel.querySelector('.totp-list');
+      const accounts = totpLoadAccounts();
+      if (!accounts.length) {
+        listEl.innerHTML = '<div class="totp-empty">暂无账户，请添加</div>';
+        return;
+      }
+      listEl.innerHTML = '';
+      for (const acct of accounts) {
+        const item = document.createElement('div');
+        item.className = 'totp-item';
+        item.innerHTML = `
+          <div class="totp-item-header">
+            <span class="totp-item-name">${esc(acct.name)}</span>
+            <button class="totp-item-del" data-id="${acct.id}" title="删除"><i class="ph ph-x"></i></button>
+          </div>
+          <div class="totp-code">------</div>
+          <div class="totp-progress"><div class="totp-progress-bar" style="width:100%"></div></div>
+          <div class="totp-item-meta"></div>
+        `;
+        item.querySelector('.totp-item-del').addEventListener('click', () => {
+          const accts = totpLoadAccounts().filter(a => a.id !== acct.id);
+          totpSaveAccounts(accts);
+          renderTotpList(panel);
+        });
+        item.querySelector('.totp-code').addEventListener('click', async (e) => {
+          const code = await totpGenerateCode(acct.secret);
+          navigator.clipboard.writeText(code).catch(() => {});
+          const el = e.target;
+          el.classList.add('copied');
+          el.textContent = code;
+          setTimeout(() => el.classList.remove('copied'), 1000);
+        });
+        listEl.appendChild(item);
+      }
+      updateTotpCodes();
+      if (totpTimer) clearInterval(totpTimer);
+      totpTimer = setInterval(updateTotpCodes, 1000);
+    }
+
+    async function updateTotpCodes() {
+      if (!totpPanel) return;
+      const accounts = totpLoadAccounts();
+      const items = totpPanel.querySelectorAll('.totp-item');
+      const period = 30;
+      const now = Math.floor(Date.now() / 1000);
+      const remaining = period - (now % period);
+      for (let i = 0; i < items.length && i < accounts.length; i++) {
+        const code = await totpGenerateCode(accounts[i].secret);
+        const codeEl = items[i].querySelector('.totp-code');
+        if (!codeEl.classList.contains('copied')) codeEl.textContent = code.slice(0, 3) + ' ' + code.slice(3);
+        const bar = items[i].querySelector('.totp-progress-bar');
+        bar.style.width = (remaining / period * 100) + '%';
+        bar.style.background = remaining <= 5 ? '#f44336' : '#4caf50';
+        const meta = items[i].querySelector('.totp-item-meta');
+        meta.textContent = `${remaining}s 后刷新`;
+      }
+    }
+
     // ============ 工具箱 ============
     const toolboxToggle = document.getElementById('toolboxToggle');
     const toolbox = document.getElementById('toolbox');
@@ -575,7 +771,10 @@
         const btns = document.createElement('div'); btns.className = 'wtb-btns';
         group.items.forEach(item => {
           const b = document.createElement('button'); b.className = 'wtb-btn'; b.textContent = item.label;
-          b.addEventListener('click', () => applyWebTool(TEXT_TOOLS[item.key]));
+          b.addEventListener('click', () => {
+            if (item.action === 'panel') { openTotpPanel(); return; }
+            applyWebTool(TEXT_TOOLS[item.key]);
+          });
           btns.appendChild(b);
         });
         g.appendChild(btns); groups.appendChild(g);
@@ -907,7 +1106,10 @@
         const btns = document.createElement('div'); btns.className = 'wtb-btns';
         group.items.forEach(item => {
           const b = document.createElement('button'); b.className = 'wtb-btn'; b.textContent = item.label;
-          b.addEventListener('click', () => applyWebTool(TEXT_TOOLS[item.key]));
+          b.addEventListener('click', () => {
+            if (item.action === 'panel') { openTotpPanel(); return; }
+            applyWebTool(TEXT_TOOLS[item.key]);
+          });
           btns.appendChild(b);
         });
         g.appendChild(btns); groups.appendChild(g);
@@ -946,6 +1148,11 @@
       if (e.key === 'Escape') {
         closeWebToolbox(); closeFindReplace(); closeRsaPanel(); closeExcelTemplate();
         toolbox.classList.remove('show');
+      }
+      // Ctrl+F / Cmd+F 查找替换
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        openFindReplace();
       }
     });
 
