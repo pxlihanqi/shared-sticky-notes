@@ -202,6 +202,33 @@
     .totp-progress-bar { height: 100%; background: #4caf50; border-radius: 2px; transition: width 1s linear; }
     .totp-item-meta { font-size: 10px; opacity: 0.5; text-align: center; margin-top: 2px; }
     .totp-empty { text-align: center; color: rgba(255,255,255,0.3); font-size: 12px; padding: 20px 0; }
+
+    /* 密码生成面板 */
+    .pwdgen-panel { position: fixed; top: 0; right: 0; width: 340px; height: auto; max-height: 100vh; overflow-y: auto; background: rgba(22,33,62,0.98); color: #fff; padding: 12px 14px 20px; box-shadow: -4px 0 24px rgba(0,0,0,0.3); z-index: 10001; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); }
+    .pwdgen-panel.show { transform: translateX(0); }
+    .pwdgen-panel::-webkit-scrollbar { width: 4px; }
+    .pwdgen-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+    .pwdgen-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .pwdgen-title { font-size: 12px; font-weight: 600; opacity: 0.9; }
+    .pwdgen-close { background: rgba(255,255,255,0.12); border: none; color: #fff; width: 18px; height: 18px; border-radius: 50%; cursor: pointer; font-size: 10px; }
+    .pwdgen-close:hover { background: rgba(255,255,255,0.25); }
+    .pwdgen-result { background: rgba(0,0,0,0.3); border-radius: 6px; padding: 10px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+    .pwdgen-text { flex: 1; font-family: 'Courier New', monospace; font-size: 16px; letter-spacing: 1px; word-break: break-all; user-select: all; min-height: 24px; }
+    .pwdgen-copy { background: rgba(76,175,80,0.6); border: none; color: #fff; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .pwdgen-copy:hover { background: rgba(76,175,80,0.85); }
+    .pwdgen-group { margin-bottom: 10px; }
+    .pwdgen-label { font-size: 11px; opacity: 0.7; margin-bottom: 4px; }
+    .pwdgen-input { width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 8px; border-radius: 6px; font-size: 11px; outline: none; }
+    .pwdgen-input:focus { border-color: rgba(76,175,80,0.75); }
+    .pwdgen-slider-row { display: flex; align-items: center; gap: 8px; }
+    .pwdgen-slider { flex: 1; height: 4px; -webkit-appearance: none; appearance: none; background: rgba(255,255,255,0.2); border-radius: 2px; outline: none; }
+    .pwdgen-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #4caf50; cursor: pointer; }
+    .pwdgen-slider-val { font-size: 12px; font-weight: 600; min-width: 24px; text-align: right; }
+    .pwdgen-opts { display: flex; flex-direction: column; gap: 6px; }
+    .pwdgen-opt { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; }
+    .pwdgen-opt input { cursor: pointer; }
+    .pwdgen-gen-btn { width: 100%; background: rgba(76,175,80,0.6); border: none; color: #fff; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: background 0.15s; }
+    .pwdgen-gen-btn:hover { background: rgba(76,175,80,0.85); }
   </style>
 </head>
 <body>
@@ -571,6 +598,82 @@
       toolbox.classList.remove('show');
     });
 
+    // ============ 密码生成器 ============
+    let pwdGenPanel = null;
+
+    function generatePassword(length, opts) {
+      let chars = '';
+      if (opts.uppercase) chars += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      if (opts.lowercase) chars += 'abcdefghijklmnopqrstuvwxyz';
+      if (opts.digits) chars += '0123456789';
+      if (opts.symbols) chars += '!@#$%^&*()_+-=[]{}|;:,.<>?';
+      if (!chars) chars = 'abcdefghijklmnopqrstuvwxyz';
+      const arr = new Uint32Array(length);
+      crypto.getRandomValues(arr);
+      return Array.from(arr, v => chars[v % chars.length]).join('');
+    }
+
+    function openPwdGenPanel() {
+      if (pwdGenPanel) { closePwdGenPanel(); return; }
+      const panel = document.createElement('div');
+      panel.className = 'pwdgen-panel';
+      panel.innerHTML = `
+        <div class="pwdgen-header">
+          <span class="pwdgen-title"><i class="ph ph-key"></i> 密码生成</span>
+          <button class="pwdgen-close" title="关闭"><i class="ph ph-x"></i></button>
+        </div>
+        <div class="pwdgen-result">
+          <span class="pwdgen-text" id="pwdGenText">-</span>
+          <button class="pwdgen-copy" title="复制"><i class="ph ph-copy"></i></button>
+        </div>
+        <div class="pwdgen-group">
+          <div class="pwdgen-label">密码长度</div>
+          <div class="pwdgen-slider-row">
+            <input class="pwdgen-slider" type="range" id="pwdLen" min="4" max="64" value="16">
+            <span class="pwdgen-slider-val" id="pwdLenVal">16</span>
+          </div>
+        </div>
+        <div class="pwdgen-group">
+          <div class="pwdgen-label">包含字符</div>
+          <div class="pwdgen-opts">
+            <label class="pwdgen-opt"><input type="checkbox" id="pwdUpper" checked> 大写字母 (A-Z)</label>
+            <label class="pwdgen-opt"><input type="checkbox" id="pwdLower" checked> 小写字母 (a-z)</label>
+            <label class="pwdgen-opt"><input type="checkbox" id="pwdDigits" checked> 数字 (0-9)</label>
+            <label class="pwdgen-opt"><input type="checkbox" id="pwdSymbols"> 特殊符号 (!@#$...)</label>
+          </div>
+        </div>
+        <button class="pwdgen-gen-btn">生成密码</button>
+      `;
+      const getOpts = () => ({
+        uppercase: panel.querySelector('#pwdUpper').checked,
+        lowercase: panel.querySelector('#pwdLower').checked,
+        digits: panel.querySelector('#pwdDigits').checked,
+        symbols: panel.querySelector('#pwdSymbols').checked,
+      });
+      const doGenerate = () => {
+        const len = parseInt(panel.querySelector('#pwdLen').value);
+        const pwd = generatePassword(len, getOpts());
+        panel.querySelector('#pwdGenText').textContent = pwd;
+      };
+      panel.querySelector('#pwdLen').addEventListener('input', (e) => {
+        panel.querySelector('#pwdLenVal').textContent = e.target.value;
+      });
+      panel.querySelector('.pwdgen-gen-btn').addEventListener('click', doGenerate);
+      panel.querySelector('.pwdgen-copy').addEventListener('click', () => {
+        const text = panel.querySelector('#pwdGenText').textContent;
+        if (text && text !== '-') navigator.clipboard.writeText(text).catch(() => {});
+      });
+      panel.querySelector('.pwdgen-close').addEventListener('click', closePwdGenPanel);
+      document.body.appendChild(panel);
+      setTimeout(() => panel.classList.add('show'), 10);
+      pwdGenPanel = panel;
+      doGenerate();
+    }
+
+    function closePwdGenPanel() {
+      if (pwdGenPanel) { pwdGenPanel.classList.remove('show'); setTimeout(() => { if (pwdGenPanel) { pwdGenPanel.remove(); pwdGenPanel = null; } }, 300); }
+    }
+
     // ============ 谷歌校验码 (TOTP) ============
     const totpBtn = document.getElementById('totpBtn');
     let totpPanel = null;
@@ -772,7 +875,7 @@
         group.items.forEach(item => {
           const b = document.createElement('button'); b.className = 'wtb-btn'; b.textContent = item.label;
           b.addEventListener('click', () => {
-            if (item.action === 'panel') { openTotpPanel(); return; }
+            if (item.action === 'panel') { item.key === 'pwdGen' ? openPwdGenPanel() : openTotpPanel(); return; }
             applyWebTool(TEXT_TOOLS[item.key]);
           });
           btns.appendChild(b);
@@ -1107,7 +1210,7 @@
         group.items.forEach(item => {
           const b = document.createElement('button'); b.className = 'wtb-btn'; b.textContent = item.label;
           b.addEventListener('click', () => {
-            if (item.action === 'panel') { openTotpPanel(); return; }
+            if (item.action === 'panel') { item.key === 'pwdGen' ? openPwdGenPanel() : openTotpPanel(); return; }
             applyWebTool(TEXT_TOOLS[item.key]);
           });
           btns.appendChild(b);
@@ -1146,7 +1249,7 @@
     // ============ ESC 关闭所有面板 ============
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
-        closeWebToolbox(); closeFindReplace(); closeRsaPanel(); closeExcelTemplate();
+        closeWebToolbox(); closeFindReplace(); closeRsaPanel(); closeExcelTemplate(); closePwdGenPanel();
         toolbox.classList.remove('show');
       }
       // Ctrl+F / Cmd+F 查找替换

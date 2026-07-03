@@ -1613,6 +1613,12 @@ const TOOL_GROUPS = [
     ],
   },
   {
+    title: '密码工具',
+    items: [
+      { key: 'pwdGen', label: '密码生成', action: 'panel' },
+    ],
+  },
+  {
     title: '校验码',
     items: [
       { key: 'totp', label: '谷歌校验码', action: 'panel' },
@@ -1807,7 +1813,7 @@ function closeToolbox() {
 }
 
 function onToolboxEsc(e) {
-  if (e.key === 'Escape') closeToolbox();
+  if (e.key === 'Escape') { closeToolbox(); closePwdGenPanel(); }
 }
 
 // ============ Excel 模板生成面板 ============
@@ -2501,7 +2507,7 @@ function openToolbox() {
       b.className = 'tb-btn';
       b.textContent = item.label;
       b.addEventListener('click', () => {
-        if (item.action === 'panel') { openTotpPanel(); return; }
+        if (item.action === 'panel') { item.key === 'pwdGen' ? openPwdGenPanel() : openTotpPanel(); return; }
         applyTool(TEXT_TOOLS[item.key]);
       });
       btns.appendChild(b);
@@ -2627,6 +2633,82 @@ function updateMdToolBtn() {
   if (!toolboxPanel) return;
   const btn = toolboxPanel.querySelector('.tb-btn-md');
   if (btn) btn.classList.toggle('md-active', markdownPreviewActive);
+}
+
+// ============ 密码生成器 ============
+let pwdGenPanel = null;
+
+function generatePassword(length, opts) {
+  let chars = '';
+  if (opts.uppercase) chars += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  if (opts.lowercase) chars += 'abcdefghijklmnopqrstuvwxyz';
+  if (opts.digits) chars += '0123456789';
+  if (opts.symbols) chars += '!@#$%^&*()_+-=[]{}|;:,.<>?';
+  if (!chars) chars = 'abcdefghijklmnopqrstuvwxyz';
+  const arr = new Uint32Array(length);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, v => chars[v % chars.length]).join('');
+}
+
+function openPwdGenPanel() {
+  if (pwdGenPanel) { closePwdGenPanel(); return; }
+  const panel = document.createElement('div');
+  panel.className = 'pwdgen-panel';
+  panel.innerHTML = `
+    <div class="pwdgen-header">
+      <span class="pwdgen-title"><i class="ph ph-key"></i> 密码生成</span>
+      <button class="pwdgen-close" title="关闭"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="pwdgen-result">
+      <span class="pwdgen-text" id="pwdGenText">-</span>
+      <button class="pwdgen-copy" title="复制"><i class="ph ph-copy"></i></button>
+    </div>
+    <div class="pwdgen-group">
+      <div class="pwdgen-label">密码长度</div>
+      <div class="pwdgen-slider-row">
+        <input class="pwdgen-slider" type="range" id="pwdLen" min="4" max="64" value="16">
+        <span class="pwdgen-slider-val" id="pwdLenVal">16</span>
+      </div>
+    </div>
+    <div class="pwdgen-group">
+      <div class="pwdgen-label">包含字符</div>
+      <div class="pwdgen-opts">
+        <label class="pwdgen-opt"><input type="checkbox" id="pwdUpper" checked> 大写字母 (A-Z)</label>
+        <label class="pwdgen-opt"><input type="checkbox" id="pwdLower" checked> 小写字母 (a-z)</label>
+        <label class="pwdgen-opt"><input type="checkbox" id="pwdDigits" checked> 数字 (0-9)</label>
+        <label class="pwdgen-opt"><input type="checkbox" id="pwdSymbols"> 特殊符号 (!@#$...)</label>
+      </div>
+    </div>
+    <button class="pwdgen-gen-btn">生成密码</button>
+  `;
+  const getOpts = () => ({
+    uppercase: panel.querySelector('#pwdUpper').checked,
+    lowercase: panel.querySelector('#pwdLower').checked,
+    digits: panel.querySelector('#pwdDigits').checked,
+    symbols: panel.querySelector('#pwdSymbols').checked,
+  });
+  const doGenerate = () => {
+    const len = parseInt(panel.querySelector('#pwdLen').value);
+    const pwd = generatePassword(len, getOpts());
+    panel.querySelector('#pwdGenText').textContent = pwd;
+  };
+  panel.querySelector('#pwdLen').addEventListener('input', (e) => {
+    panel.querySelector('#pwdLenVal').textContent = e.target.value;
+  });
+  panel.querySelector('.pwdgen-gen-btn').addEventListener('click', doGenerate);
+  panel.querySelector('.pwdgen-copy').addEventListener('click', () => {
+    const text = panel.querySelector('#pwdGenText').textContent;
+    if (text && text !== '-') navigator.clipboard.writeText(text).catch(() => {});
+  });
+  panel.querySelector('.pwdgen-close').addEventListener('click', closePwdGenPanel);
+  document.body.appendChild(panel);
+  setTimeout(() => panel.classList.add('show'), 10);
+  pwdGenPanel = panel;
+  doGenerate();
+}
+
+function closePwdGenPanel() {
+  if (pwdGenPanel) { pwdGenPanel.classList.remove('show'); setTimeout(() => { if (pwdGenPanel) { pwdGenPanel.remove(); pwdGenPanel = null; } }, 300); }
 }
 
 // ============ 谷歌校验码 (TOTP) ============

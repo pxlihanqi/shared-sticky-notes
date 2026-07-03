@@ -272,6 +272,9 @@ const TOOL_GROUPS = [
   { title: '实用工具', items: [
     { key: 'generateQR', label: '生成二维码' },
   ]},
+  { title: '密码工具', items: [
+    { key: 'pwdGen', label: '密码生成', action: 'panel' },
+  ]},
   { title: '校验码', items: [
     { key: 'totp', label: '谷歌校验码', action: 'panel' },
   ]},
