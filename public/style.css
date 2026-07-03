@@ -1918,6 +1918,344 @@ body {
   transition: background 0.15s;
 }
 .pwdgen-gen-btn:hover { background: rgba(76, 175, 80, 0.85); }
+
+/* Cron 表达式面板 */
+.cron-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 340px;
+  height: auto;
+  max-height: 100vh;
+  overflow-y: auto;
+  background: rgba(22, 33, 62, 0.98);
+  color: #fff;
+  padding: 12px 14px 20px;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3);
+  z-index: 10001;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.cron-panel.show { transform: translateX(0); }
+.cron-panel::-webkit-scrollbar { width: 4px; }
+.cron-panel::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 2px; }
+.cron-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.cron-title { font-size: 12px; font-weight: 600; opacity: 0.9; }
+.cron-close {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: #fff;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 10px;
+}
+.cron-close:hover { background: rgba(255, 255, 255, 0.25); }
+.cron-input-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.cron-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.cron-field-label {
+  font-size: 9px;
+  opacity: 0.5;
+  text-transform: uppercase;
+}
+.cron-field-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 5px 2px;
+  border-radius: 4px;
+  font-size: 12px;
+  text-align: center;
+  font-family: 'Courier New', monospace;
+  outline: none;
+}
+.cron-field-input:focus { border-color: rgba(76, 175, 80, 0.75); }
+.cron-result {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  letter-spacing: 1px;
+  user-select: all;
+  word-break: break-all;
+}
+.cron-desc {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 10px;
+  line-height: 1.5;
+  min-height: 18px;
+}
+.cron-next {
+  font-size: 10px;
+  opacity: 0.5;
+  margin-bottom: 10px;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+.cron-section-title {
+  font-size: 10px;
+  opacity: 0.45;
+  margin-bottom: 6px;
+  margin-top: 4px;
+}
+.cron-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.cron-preset {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.cron-preset:hover { background: rgba(76, 175, 80, 0.75); }
+.cron-actions {
+  display: flex;
+  gap: 6px;
+}
+.cron-copy-btn {
+  flex: 1;
+  background: rgba(76, 175, 80, 0.6);
+  border: none;
+  color: #fff;
+  padding: 7px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.15s;
+}
+.cron-copy-btn:hover { background: rgba(76, 175, 80, 0.85); }
+.cron-status {
+  font-size: 10px;
+  opacity: 0.6;
+  margin-top: 8px;
+  min-height: 14px;
+}
+
+/* 正则表达式面板 */
+.regex-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 340px;
+  height: auto;
+  max-height: 100vh;
+  overflow-y: auto;
+  background: rgba(22, 33, 62, 0.98);
+  color: #fff;
+  padding: 12px 14px 20px;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3);
+  z-index: 10001;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.regex-panel.show { transform: translateX(0); }
+.regex-panel::-webkit-scrollbar { width: 4px; }
+.regex-panel::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 2px; }
+.regex-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.regex-title { font-size: 12px; font-weight: 600; opacity: 0.9; }
+.regex-close {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: #fff;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 10px;
+}
+.regex-close:hover { background: rgba(255, 255, 255, 0.25); }
+.regex-section-title {
+  font-size: 10px;
+  opacity: 0.45;
+  margin-bottom: 6px;
+  margin-top: 4px;
+}
+.regex-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: 'Courier New', monospace;
+  outline: none;
+  margin-bottom: 6px;
+}
+.regex-input:focus { border-color: rgba(76, 175, 80, 0.75); }
+.regex-input::placeholder { color: rgba(255, 255, 255, 0.3); font-family: -apple-system, sans-serif; }
+.regex-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: -apple-system, sans-serif;
+  outline: none;
+  resize: vertical;
+  min-height: 60px;
+  margin-bottom: 6px;
+}
+.regex-textarea:focus { border-color: rgba(76, 175, 80, 0.75); }
+.regex-textarea::placeholder { color: rgba(255, 255, 255, 0.3); }
+.regex-flags {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 11px;
+}
+.regex-flag { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+.regex-flag input { cursor: pointer; }
+.regex-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.regex-preset {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.regex-preset:hover { background: rgba(76, 175, 80, 0.75); }
+.regex-result {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  min-height: 18px;
+  word-break: break-all;
+}
+.regex-matches {
+  font-size: 10px;
+  opacity: 0.7;
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+.regex-match {
+  background: rgba(76, 175, 80, 0.3);
+  border: 1px solid rgba(76, 175, 80, 0.5);
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  margin: 2px 0;
+  display: inline-block;
+  word-break: break-all;
+}
+.regex-no-match {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 10px;
+}
+.regex-actions {
+  display: flex;
+  gap: 6px;
+}
+.regex-copy-btn {
+  flex: 1;
+  background: rgba(76, 175, 80, 0.6);
+  border: none;
+  color: #fff;
+  padding: 7px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.15s;
+}
+.regex-copy-btn:hover { background: rgba(76, 175, 80, 0.85); }
+.regex-help {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: #fff;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 10px;
+}
+.regex-help:hover { background: rgba(255, 255, 255, 0.25); }
+.regex-help-content {
+  background: rgba(22, 33, 62, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 10px;
+  line-height: 1.8;
+  color: rgba(255, 255, 255, 0.85);
+  display: none;
+}
+.regex-help-content.show { display: block; }
+.regex-help-content::-webkit-scrollbar { width: 3px; }
+.regex-help-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+.regex-help-content code {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #4caf50;
+}
+.regex-help-content .rh-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  margin: 6px 0 2px;
+}
+.regex-help-content .rh-title:first-child { margin-top: 0; }
+.regex-status {
+  font-size: 10px;
+  opacity: 0.6;
+  margin-top: 8px;
+  min-height: 14px;
+}
 .markdown-preview {
   flex: 1;
   overflow-y: auto;

@@ -1619,6 +1619,18 @@ const TOOL_GROUPS = [
     ],
   },
   {
+    title: '定时任务',
+    items: [
+      { key: 'cron', label: 'Cron生成', action: 'panel' },
+    ],
+  },
+  {
+    title: '正则工具',
+    items: [
+      { key: 'regex', label: '正则生成', action: 'panel' },
+    ],
+  },
+  {
     title: '校验码',
     items: [
       { key: 'totp', label: '谷歌校验码', action: 'panel' },
@@ -1813,7 +1825,7 @@ function closeToolbox() {
 }
 
 function onToolboxEsc(e) {
-  if (e.key === 'Escape') { closeToolbox(); closePwdGenPanel(); }
+  if (e.key === 'Escape') { closeToolbox(); closePwdGenPanel(); closeCronPanel(); closeRegexPanel(); }
 }
 
 // ============ Excel 模板生成面板 ============
@@ -2507,7 +2519,7 @@ function openToolbox() {
       b.className = 'tb-btn';
       b.textContent = item.label;
       b.addEventListener('click', () => {
-        if (item.action === 'panel') { item.key === 'pwdGen' ? openPwdGenPanel() : openTotpPanel(); return; }
+        if (item.action === 'panel') { item.key === 'pwdGen' ? openPwdGenPanel() : item.key === 'cron' ? openCronPanel() : item.key === 'regex' ? openRegexPanel() : openTotpPanel(); return; }
         applyTool(TEXT_TOOLS[item.key]);
       });
       btns.appendChild(b);
@@ -2651,7 +2663,7 @@ function generatePassword(length, opts) {
 }
 
 function openPwdGenPanel() {
-  if (pwdGenPanel) { closePwdGenPanel(); return; }
+  if (pwdGenPanel) { closePwdGenPanel(); closeCronPanel(); closeRegexPanel(); return; }
   const panel = document.createElement('div');
   panel.className = 'pwdgen-panel';
   panel.innerHTML = `
@@ -2709,6 +2721,367 @@ function openPwdGenPanel() {
 
 function closePwdGenPanel() {
   if (pwdGenPanel) { pwdGenPanel.classList.remove('show'); setTimeout(() => { if (pwdGenPanel) { pwdGenPanel.remove(); pwdGenPanel = null; } }, 300); }
+}
+
+// ============ Cron 表达式生成/验证 ============
+let cronPanel = null;
+
+const CRON_PRESETS = [
+  { label: '每分钟', expr: '* * * * *' },
+  { label: '每小时', expr: '0 * * * *' },
+  { label: '每天0点', expr: '0 0 * * *' },
+  { label: '每周一9点', expr: '0 9 * * 1' },
+  { label: '每月1号', expr: '0 0 1 * *' },
+  { label: '每5分钟', expr: '*/5 * * * *' },
+  { label: '工作日9点', expr: '0 9 * * 1-5' },
+  { label: '每30秒', expr: '* * * * * *' },
+];
+
+const CRON_NAMES = ['秒', '分', '时', '日', '月', '周'];
+const CRON_DAYS = ['日', '一', '二', '三', '四', '五', '六'];
+
+function parseCronField(field, min, max) {
+  if (field === '*') return `每${max === 59 ? '分钟' : max === 23 ? '小时' : max === 6 ? '周' : max === 31 ? '天' : max === 59 ? '秒' : '月'}`;
+  const results = [];
+  const parts = field.split(',');
+  for (const part of parts) {
+    if (part.includes('/')) {
+      const [start, step] = part.split('/');
+      results.push(`从${start === '*' ? min : start}开始每隔${step}`);
+    } else if (part.includes('-')) {
+      const [a, b] = part.split('-');
+      results.push(`${a}-${b}`);
+    } else {
+      results.push(part);
+    }
+  }
+  return results.join(',');
+}
+
+function describeCron(fields) {
+  if (fields.length < 5) return '';
+  const [min, hour, day, month, dow] = fields;
+  const parts = [];
+  if (month !== '*') parts.push(`月${parseCronField(month, 1, 12)}`);
+  if (day !== '*') parts.push(`日${parseCronField(day, 1, 31)}`);
+  if (dow !== '*') {
+    const dowNames = dow.split(',').map(d => CRON_DAYS[parseInt(d)] || d).join(',');
+    parts.push(`周${dowNames}`);
+  }
+  if (hour !== '*') parts.push(`${hour}时`);
+  if (min !== '*') parts.push(`${min}分`);
+  if (parts.length === 0) return '每分钟执行';
+  return parts.join(' ') + ' 执行';
+}
+
+function getNextRuns(expr, count = 5) {
+  const fields = expr.trim().split(/\s+/);
+  if (fields.length < 5) return [];
+  const [minF, hourF, dayF, monthF, dowF] = fields;
+  const runs = [];
+  const d = new Date();
+  d.setSeconds(0);
+  d.setMilliseconds(0);
+  d.setMinutes(d.getMinutes() + 1);
+  const maxIter = 366 * 24 * 60;
+  for (let i = 0; i < maxIter && runs.length < count; i++) {
+    if (!matchCronField(d.getMinutes(), minF)) { d.setMinutes(d.getMinutes() + 1); continue; }
+    if (!matchCronField(d.getHours(), hourF)) { d.setMinutes(d.getMinutes() + 1); continue; }
+    if (!matchCronField(d.getDate(), dayF)) { d.setDate(d.getDate() + 1); d.setHours(0); d.setMinutes(0); continue; }
+    if (!matchCronField(d.getMonth() + 1, monthF)) { d.setDate(d.getDate() + 1); d.setHours(0); d.setMinutes(0); continue; }
+    if (!matchCronField(d.getDay(), dowF)) { d.setDate(d.getDate() + 1); d.setHours(0); d.setMinutes(0); continue; }
+    runs.push(new Date(d));
+    d.setMinutes(d.getMinutes() + 1);
+  }
+  return runs;
+}
+
+function matchCronField(val, field) {
+  if (field === '*') return true;
+  for (const part of field.split(',')) {
+    if (part.includes('/')) {
+      const [start, step] = part.split('/');
+      const s = start === '*' ? 0 : parseInt(start);
+      if (val >= s && (val - s) % parseInt(step) === 0) return true;
+    } else if (part.includes('-')) {
+      const [a, b] = part.split('-').map(Number);
+      if (val >= a && val <= b) return true;
+    } else {
+      if (val === parseInt(part)) return true;
+    }
+  }
+  return false;
+}
+
+function openCronPanel() {
+  if (cronPanel) { closeCronPanel(); return; }
+  const panel = document.createElement('div');
+  panel.className = 'cron-panel';
+  panel.innerHTML = `
+    <div class="cron-header">
+      <span class="cron-title"><i class="ph ph-clock"></i> Cron 表达式</span>
+      <button class="cron-close" title="关闭"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="cron-section-title">快速预设</div>
+    <div class="cron-presets"></div>
+    <div class="cron-section-title">手动设置</div>
+    <div class="cron-input-row">
+      <div class="cron-field"><span class="cron-field-label">分</span><input class="cron-field-input" id="cronMin" value="*"></div>
+      <div class="cron-field"><span class="cron-field-label">时</span><input class="cron-field-input" id="cronHour" value="*"></div>
+      <div class="cron-field"><span class="cron-field-label">日</span><input class="cron-field-input" id="cronDay" value="*"></div>
+      <div class="cron-field"><span class="cron-field-label">月</span><input class="cron-field-input" id="cronMonth" value="*"></div>
+      <div class="cron-field"><span class="cron-field-label">周</span><input class="cron-field-input" id="cronDow" value="*"></div>
+    </div>
+    <div class="cron-section-title">或直接输入表达式</div>
+    <input class="cron-field-input" id="cronExprInput" style="width:100%;text-align:left;margin-bottom:10px;" placeholder="* * * * *">
+    <div class="cron-result" id="cronResult">* * * * *</div>
+    <div class="cron-desc" id="cronDesc">每分钟执行</div>
+    <div class="cron-next" id="cronNext"></div>
+    <div class="cron-actions">
+      <button class="cron-copy-btn"><i class="ph ph-copy"></i> 复制表达式</button>
+    </div>
+    <div class="cron-status" id="cronStatus"></div>
+  `;
+  const presetsEl = panel.querySelector('.cron-presets');
+  CRON_PRESETS.forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = 'cron-preset';
+    btn.textContent = p.label;
+    btn.addEventListener('click', () => {
+      const fields = p.expr.split(' ');
+      panel.querySelector('#cronMin').value = fields[0] || '*';
+      panel.querySelector('#cronHour').value = fields[1] || '*';
+      panel.querySelector('#cronDay').value = fields[2] || '*';
+      panel.querySelector('#cronMonth').value = fields[3] || '*';
+      panel.querySelector('#cronDow').value = fields[4] || '*';
+      panel.querySelector('#cronExprInput').value = p.expr;
+      updateCronResult();
+    });
+    presetsEl.appendChild(btn);
+  });
+
+  function getFields() {
+    return [
+      panel.querySelector('#cronMin').value.trim() || '*',
+      panel.querySelector('#cronHour').value.trim() || '*',
+      panel.querySelector('#cronDay').value.trim() || '*',
+      panel.querySelector('#cronMonth').value.trim() || '*',
+      panel.querySelector('#cronDow').value.trim() || '*',
+    ];
+  }
+
+  function updateCronResult() {
+    const exprInput = panel.querySelector('#cronExprInput').value.trim();
+    let fields;
+    if (exprInput && exprInput.split(/\s+/).length >= 5) {
+      fields = exprInput.split(/\s+/).slice(0, 5);
+      panel.querySelector('#cronMin').value = fields[0];
+      panel.querySelector('#cronHour').value = fields[1];
+      panel.querySelector('#cronDay').value = fields[2];
+      panel.querySelector('#cronMonth').value = fields[3];
+      panel.querySelector('#cronDow').value = fields[4];
+    } else {
+      fields = getFields();
+      panel.querySelector('#cronExprInput').value = fields.join(' ');
+    }
+    const expr = fields.join(' ');
+    panel.querySelector('#cronResult').textContent = expr;
+    panel.querySelector('#cronDesc').textContent = describeCron(fields);
+    const nextRuns = getNextRuns(expr);
+    if (nextRuns.length > 0) {
+      const weekdays = ['周日','周一','周二','周三','周四','周五','周六'];
+      panel.querySelector('#cronNext').innerHTML = '接下来5次：<br>' + nextRuns.map((d, i) =>
+        `${i+1}. ${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${weekdays[d.getDay()]} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
+      ).join('<br>');
+    } else {
+      panel.querySelector('#cronNext').textContent = '无匹配的执行时间';
+    }
+    panel.querySelector('#cronStatus').textContent = '';
+  }
+
+  ['cronMin', 'cronHour', 'cronDay', 'cronMonth', 'cronDow'].forEach(id => {
+    panel.querySelector('#' + id).addEventListener('input', () => {
+      panel.querySelector('#cronExprInput').value = getFields().join(' ');
+      updateCronResult();
+    });
+  });
+  panel.querySelector('#cronExprInput').addEventListener('input', updateCronResult);
+
+  panel.querySelector('.cron-copy-btn').addEventListener('click', () => {
+    const expr = panel.querySelector('#cronResult').textContent;
+    navigator.clipboard.writeText(expr).catch(() => {});
+    panel.querySelector('#cronStatus').textContent = '已复制';
+  });
+  panel.querySelector('.cron-close').addEventListener('click', closeCronPanel);
+  document.body.appendChild(panel);
+  setTimeout(() => panel.classList.add('show'), 10);
+  cronPanel = panel;
+  updateCronResult();
+}
+
+function closeCronPanel() {
+  if (cronPanel) { cronPanel.classList.remove('show'); setTimeout(() => { if (cronPanel) { cronPanel.remove(); cronPanel = null; } }, 300); }
+}
+
+// ============ 正则表达式生成/验证 ============
+let regexPanel = null;
+
+const REGEX_PRESETS = [
+  { label: '手机号', pattern: '1[3-9]\\d{9}', desc: '中国大陆手机号' },
+  { label: '身份证', pattern: '[1-9]\\d{5}(?:19|20)\\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\\d|3[01])\\d{3}[\\dXx]', desc: '18位身份证号' },
+  { label: '邮箱', pattern: '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}', desc: '电子邮箱地址' },
+  { label: 'URL', pattern: 'https?://[^\\s/$.?#].[^\\s]*', desc: 'HTTP/HTTPS 链接' },
+  { label: 'IP地址', pattern: '(?:\\d{1,3}\\.){3}\\d{1,3}', desc: 'IPv4 地址' },
+  { label: '日期', pattern: '\\d{4}[-/](?:0[1-9]|1[0-2])[-/](?:0[1-9]|[12]\\d|3[01])', desc: 'YYYY-MM-DD 格式日期' },
+  { label: '时间', pattern: '(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?', desc: 'HH:MM 或 HH:MM:SS' },
+  { label: '中文', pattern: '[\\u4e00-\\u9fa5]+', desc: '连续中文字符' },
+  { label: '字母数字', pattern: '[a-zA-Z0-9]+', desc: '字母和数字' },
+  { label: 'HTML标签', pattern: '<([a-z][a-z0-9]*)\\b[^>]*>(.*?)</\\1>', desc: '匹配 HTML 标签' },
+];
+
+function openRegexPanel() {
+  if (regexPanel) { closeRegexPanel(); return; }
+  const panel = document.createElement('div');
+  panel.className = 'regex-panel';
+  panel.innerHTML = `
+    <div class="regex-header">
+      <span class="regex-title"><i class="ph ph-asterisk"></i> 正则表达式</span>
+      <div style="display:flex;gap:4px;">
+        <button class="regex-help" title="正则语法速查"><i class="ph ph-question"></i></button>
+        <button class="regex-close" title="关闭"><i class="ph ph-x"></i></button>
+      </div>
+    </div>
+    <div class="regex-help-content" id="regexHelpContent">
+      <div class="rh-title">字符匹配</div>
+      <code>.</code> 任意单个字符 &nbsp; <code>\\d</code> 数字 &nbsp; <code>\\D</code> 非数字<br>
+      <code>\\w</code> 字母数字下划线 &nbsp; <code>\\W</code> 非单词字符<br>
+      <code>\\s</code> 空白字符 &nbsp; <code>\\S</code> 非空白字符
+      <div class="rh-title">量词</div>
+      <code>*</code> 0次或多次 &nbsp; <code>+</code> 1次或多次 &nbsp; <code>?</code> 0次或1次<br>
+      <code>{n}</code> 恰好n次 &nbsp; <code>{n,}</code> 至少n次 &nbsp; <code>{n,m}</code> n到m次
+      <div class="rh-title">位置</div>
+      <code>^</code> 行首 &nbsp; <code>$</code> 行尾 &nbsp; <code>\\b</code> 单词边界
+      <div class="rh-title">字符类</div>
+      <code>[abc]</code> a或b或c &nbsp; <code>[a-z]</code> a到z &nbsp; <code>[^abc]</code> 非abc
+      <div class="rh-title">分组与引用</div>
+      <code>(abc)</code> 捕获分组 &nbsp; <code>(?:abc)</code> 非捕获分组<br>
+      <code>\\1</code> 反向引用 &nbsp; <code>a|b</code> a或b
+      <div class="rh-title">断言</div>
+      <code>(?=abc)</code> 正向前瞻 &nbsp; <code>(?!abc)</code> 负向前瞻<br>
+      <code>(?&lt;=abc)</code> 正向后顾 &nbsp; <code>(?&lt;!abc)</code> 负向后顾
+    </div>
+    <div class="regex-section-title">常用正则预设</div>
+    <div class="regex-presets"></div>
+    <div class="regex-section-title">正则表达式</div>
+    <input class="regex-input" id="regexPattern" placeholder="输入正则表达式，如: \\d+" value="">
+    <div class="regex-flags">
+      <label class="regex-flag"><input type="checkbox" id="regexG" checked> g (全局)</label>
+      <label class="regex-flag"><input type="checkbox" id="regexI"> i (忽略大小写)</label>
+      <label class="regex-flag"><input type="checkbox" id="regexM"> m (多行)</label>
+      <label class="regex-flag"><input type="checkbox" id="regexS"> s (点号匹配换行)</label>
+    </div>
+    <div class="regex-section-title">测试文本</div>
+    <textarea class="regex-textarea" id="regexTestText" placeholder="输入要匹配的文本..."></textarea>
+    <div class="regex-section-title">匹配结果</div>
+    <div class="regex-result" id="regexResult">-</div>
+    <div class="regex-matches" id="regexMatches"></div>
+    <div class="regex-actions">
+      <button class="regex-copy-btn"><i class="ph ph-copy"></i> 复制正则</button>
+    </div>
+    <div class="regex-status" id="regexStatus"></div>
+  `;
+  const presetsEl = panel.querySelector('.regex-presets');
+  REGEX_PRESETS.forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = 'regex-preset';
+    btn.textContent = p.label;
+    btn.title = p.desc;
+    btn.addEventListener('click', () => {
+      panel.querySelector('#regexPattern').value = p.pattern;
+      updateRegexResult();
+    });
+    presetsEl.appendChild(btn);
+  });
+
+  function getFlags() {
+    let flags = '';
+    if (panel.querySelector('#regexG').checked) flags += 'g';
+    if (panel.querySelector('#regexI').checked) flags += 'i';
+    if (panel.querySelector('#regexM').checked) flags += 'm';
+    if (panel.querySelector('#regexS').checked) flags += 's';
+    return flags;
+  }
+
+  function updateRegexResult() {
+    const pattern = panel.querySelector('#regexPattern').value;
+    const text = panel.querySelector('#regexTestText').value;
+    const resultEl = panel.querySelector('#regexResult');
+    const matchesEl = panel.querySelector('#regexMatches');
+    if (!pattern) {
+      resultEl.textContent = '-';
+      matchesEl.innerHTML = '';
+      return;
+    }
+    try {
+      const flags = getFlags();
+      const re = new RegExp(pattern, flags);
+      resultEl.textContent = '/' + pattern + '/' + flags;
+      if (!text) {
+        matchesEl.innerHTML = '<span class="regex-no-match">输入测试文本查看匹配</span>';
+        return;
+      }
+      const matches = [];
+      let m;
+      if (flags.includes('g')) {
+        while ((m = re.exec(text)) !== null) {
+          matches.push({ value: m[0], index: m.index, groups: m.slice(1) });
+          if (m[0].length === 0) re.lastIndex++;
+        }
+      } else {
+        m = re.exec(text);
+        if (m) matches.push({ value: m[0], index: m.index, groups: m.slice(1) });
+      }
+      if (matches.length === 0) {
+        matchesEl.innerHTML = '<span class="regex-no-match">无匹配结果</span>';
+      } else {
+        matchesEl.innerHTML = matches.map((m, i) => {
+          let html = `<span class="regex-match">${escapeHTML(m.value)}</span>`;
+          if (m.groups.length > 0) html += ` <span style="opacity:0.5">分组: ${m.groups.map(g => escapeHTML(g || '')).join(', ')}</span>`;
+          html += ` <span style="opacity:0.4">位置:${m.index}</span>`;
+          return html;
+        }).join('<br>');
+      }
+      panel.querySelector('#regexStatus').textContent = `匹配 ${matches.length} 处`;
+    } catch (err) {
+      resultEl.textContent = '错误: ' + err.message;
+      matchesEl.innerHTML = '';
+    }
+  }
+
+  panel.querySelector('#regexPattern').addEventListener('input', updateRegexResult);
+  panel.querySelector('#regexTestText').addEventListener('input', updateRegexResult);
+  ['regexG', 'regexI', 'regexM', 'regexS'].forEach(id => {
+    panel.querySelector('#' + id).addEventListener('change', updateRegexResult);
+  });
+  panel.querySelector('.regex-copy-btn').addEventListener('click', () => {
+    const pattern = panel.querySelector('#regexPattern').value;
+    const flags = getFlags();
+    const full = '/' + pattern + '/' + flags;
+    navigator.clipboard.writeText(full).catch(() => {});
+    panel.querySelector('#regexStatus').textContent = '已复制';
+  });
+  panel.querySelector('.regex-help').addEventListener('click', () => {
+    panel.querySelector('#regexHelpContent').classList.toggle('show');
+  });
+  panel.querySelector('.regex-close').addEventListener('click', closeRegexPanel);
+  document.body.appendChild(panel);
+  setTimeout(() => panel.classList.add('show'), 10);
+  regexPanel = panel;
+  updateRegexResult();
+}
+
+function closeRegexPanel() {
+  if (regexPanel) { regexPanel.classList.remove('show'); setTimeout(() => { if (regexPanel) { regexPanel.remove(); regexPanel = null; } }, 300); }
 }
 
 // ============ 谷歌校验码 (TOTP) ============

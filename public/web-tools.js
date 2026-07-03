@@ -275,6 +275,12 @@ const TOOL_GROUPS = [
   { title: '密码工具', items: [
     { key: 'pwdGen', label: '密码生成', action: 'panel' },
   ]},
+  { title: '定时任务', items: [
+    { key: 'cron', label: 'Cron生成', action: 'panel' },
+  ]},
+  { title: '正则工具', items: [
+    { key: 'regex', label: '正则生成', action: 'panel' },
+  ]},
   { title: '校验码', items: [
     { key: 'totp', label: '谷歌校验码', action: 'panel' },
   ]},
